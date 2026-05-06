@@ -1,4 +1,5 @@
 import json
+import re
 from PySide6.QtWidgets import (QWidget, QPlainTextEdit, QTextEdit)
 from PySide6.QtGui import (QPainter, QTextFormat, QColor, QSyntaxHighlighter, 
                            QTextCharFormat, QFont, QShortcut, QKeySequence)
@@ -50,6 +51,66 @@ class JsonHighlighter(QSyntaxHighlighter):
         # Keywords
         for match in re.finditer(r"\b(true|false|null)\b", text):
             self.setFormat(match.start(), match.end() - match.start(), self.formats["keyword"])
+
+class PythonHighlighter(QSyntaxHighlighter):
+    KEYWORDS = (
+        "False", "None", "True", "and", "as", "assert", "async", "await",
+        "break", "class", "continue", "def", "del", "elif", "else", "except",
+        "finally", "for", "from", "global", "if", "import", "in", "is",
+        "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try",
+        "while", "with", "yield"
+    )
+    BUILTINS = (
+        "abs", "all", "any", "bin", "bool", "bytes", "callable", "chr",
+        "dict", "dir", "divmod", "enumerate", "eval", "exec", "filter",
+        "float", "format", "frozenset", "getattr", "globals", "hasattr",
+        "hash", "hex", "id", "input", "int", "isinstance", "issubclass",
+        "iter", "len", "list", "locals", "map", "max", "min", "next",
+        "object", "open", "ord", "pow", "print", "range", "repr",
+        "reversed", "round", "set", "setattr", "slice", "sorted", "str",
+        "sum", "super", "tuple", "type", "vars", "zip"
+    )
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def _fmt(self, color: str, bold: bool = False) -> QTextCharFormat:
+        fmt = QTextCharFormat()
+        fmt.setForeground(QColor(color))
+        if bold:
+            fmt.setFontWeight(QFont.Bold)
+        return fmt
+
+    def highlightBlock(self, text):
+        # Comments
+        for m in re.finditer(r"#[^\n]*", text):
+            self.setFormat(m.start(), m.end() - m.start(), self._fmt("#75715e"))
+
+        # Triple-quoted strings (single-line portion)
+        for m in re.finditer(r'""".*?"""|\'\'\'.*?\'\'\'', text):
+            self.setFormat(m.start(), m.end() - m.start(), self._fmt("#e6db74"))
+
+        # Single / double quoted strings
+        for m in re.finditer(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'', text):
+            self.setFormat(m.start(), m.end() - m.start(), self._fmt("#e6db74"))
+
+        # Decorators
+        for m in re.finditer(r"@\w+", text):
+            self.setFormat(m.start(), m.end() - m.start(), self._fmt("#a6e22e"))
+
+        # Keywords
+        kw_pat = r"\b(?:" + "|".join(self.KEYWORDS) + r")\b"
+        for m in re.finditer(kw_pat, text):
+            self.setFormat(m.start(), m.end() - m.start(), self._fmt("#f92672", True))
+
+        # Builtins
+        bi_pat = r"\b(?:" + "|".join(self.BUILTINS) + r")\b"
+        for m in re.finditer(bi_pat, text):
+            self.setFormat(m.start(), m.end() - m.start(), self._fmt("#66d9e8"))
+
+        # Numbers
+        for m in re.finditer(r"\b\d+(\.\d+)?\b", text):
+            self.setFormat(m.start(), m.end() - m.start(), self._fmt("#ae81ff"))
 
 class LineNumberArea(QWidget):
     def __init__(self, editor):
@@ -165,3 +226,37 @@ class CodeEditor(QPlainTextEdit):
             self.setPlainText(formatted)
         except:
             pass
+
+class PythonCodeEditor(CodeEditor):
+    """CodeEditor variant configured for Python pre-request scripts.
+
+    - Replaces JSON highlighter with PythonHighlighter (Monokai palette)
+    - Disables JSON validation (no red background flash on syntax errors)
+    - Tab key inserts 4 spaces instead of a tab character
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Disconnect JSON-specific validation
+        self.textChanged.disconnect(self.validate_json)
+        # Swap highlighter to Python
+        self.highlighter.setDocument(None)
+        self.highlighter = PythonHighlighter(self.document())
+        # Neutral Monokai background
+        self.setStyleSheet("background-color: #272822; color: #f8f8f2;")
+        self.setPlaceholderText(
+            "# Pre-request script\n"
+            "# Available: env  — dict with current environment variables\n"
+            "# Example:\n"
+            "# import hashlib\n"
+            "# env['signature'] = hashlib.md5(b'secret').hexdigest()"
+        )
+
+    def validate_json(self):
+        """Intentionally disabled — Python scripts are not JSON."""
+        pass
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Tab:
+            self.insertPlainText("    ")
+        else:
+            super().keyPressEvent(event)

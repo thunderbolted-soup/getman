@@ -4,12 +4,12 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QHBoxLayout,
                              QPlainTextEdit, QRadioButton, QButtonGroup, QDialog, QStackedWidget)
 from PySide6.QtCore import Qt, Signal, QUrl
 from ui.auth_widget import AuthManagementWidget
-from ui.json_editor import CodeEditor
-from ui.shared_widgets import KeyValueTable
+from ui.json_editor import CodeEditor, PythonCodeEditor
+from ui.shared_widgets import KeyValueTable, FormDataTable
 from core.auth import get_auth_entries, get_last_auth_for_host, set_last_auth_for_host, get_auth_by_id
 
 class RequestPanel(QWidget):
-    send_requested = Signal(str, str, dict, str, dict) # method, url, headers, body, params
+    send_requested = Signal(str, str, dict, str, dict, str) # method, url, headers, body, params, pre_script
     save_requested = Signal(dict)
 
     def __init__(self, parent=None):
@@ -79,7 +79,7 @@ class RequestPanel(QWidget):
         self.body_stack.addWidget(self.json_edit)
         
         # Form data page
-        self.form_table = KeyValueTable()
+        self.form_table = FormDataTable()
         self.body_stack.addWidget(self.form_table)
         
         # URL encoded page
@@ -104,6 +104,15 @@ class RequestPanel(QWidget):
         auth_layout.addLayout(profile_layout)
         auth_layout.addStretch()
         self.tabs.addTab(self.auth_widget, "Auth")
+        
+        # Pre-request Script Tab
+        prereq_container = QWidget()
+        prereq_layout = QVBoxLayout(prereq_container)
+        prereq_layout.setContentsMargins(4, 4, 4, 4)
+        prereq_layout.addWidget(QLabel("Python script executed before each request. Modify 'env' dict to inject variables."))
+        self.prereq_editor = PythonCodeEditor()
+        prereq_layout.addWidget(self.prereq_editor)
+        self.tabs.addTab(prereq_container, "Pre-request")
         
         layout.addWidget(self.tabs)
         self.url_edit.textChanged.connect(self.on_url_changed)
@@ -153,8 +162,8 @@ class RequestPanel(QWidget):
             if "Content-Type" not in headers:
                 headers["Content-Type"] = "application/json"
         elif self.form_rb.isChecked():
-            # Minimal form-data support (just as string for now)
-            body = str(self.form_table.get_data())
+            # Pass the list of form items
+            body = self.form_table.get_data()
         elif self.urlencode_rb.isChecked():
             body = str(self.urlencode_table.get_data())
             if "Content-Type" not in headers:
@@ -169,16 +178,22 @@ class RequestPanel(QWidget):
                 if host:
                     set_last_auth_for_host(host, auth_id)
         
-        self.send_requested.emit(method, url, headers, body, params)
+        self.send_requested.emit(method, url, headers, body, params, self.prereq_editor.toPlainText())
 
     def on_save_clicked(self):
+        body_data = ""
+        if self.json_rb.isChecked(): body_data = self.json_edit.toPlainText()
+        elif self.form_rb.isChecked(): body_data = self.form_table.get_data()
+        elif self.urlencode_rb.isChecked(): body_data = self.urlencode_table.get_data()
+            
         data = {
             "method": self.method_combo.currentText(),
             "url": self.url_edit.text(),
             "headers": self.headers_table.get_data(),
             "params": self.params_table.get_data(),
             "body_type": self.body_type_group.checkedButton().text(),
-            "body": self.json_edit.toPlainText() if self.json_rb.isChecked() else ""
+            "body": body_data,
+            "pre_request_script": self.prereq_editor.toPlainText()
         }
         self.save_requested.emit(data)
 
@@ -212,7 +227,8 @@ class RequestPanel(QWidget):
             if "Content-Type" not in headers:
                 headers["Content-Type"] = "application/json"
         elif self.form_rb.isChecked():
-            body = str(self.form_table.get_data())
+            form_items = self.form_table.get_data()
+            body = "form-data-objects" # Placeholder for cURL body
         elif self.urlencode_rb.isChecked():
             body = str(self.urlencode_table.get_data())
             if "Content-Type" not in headers:
@@ -224,9 +240,17 @@ class RequestPanel(QWidget):
             curl += f" \\\n  -H '{k}: {v}'"
         
         if body:
-            # Basic escaping for single quotes in body
-            safe_body = body.replace("'", "'\\''")
-            curl += f" \\\n  -d '{safe_body}'"
+            if self.form_rb.isChecked():
+                for item in self.form_table.get_data():
+                    if item.get("type") == "File":
+                        curl += f" \\\n  -F '{item.get('key')}=@{item.get('value')}'"
+                    else:
+                        val = str(item.get('value')).replace("'", "'\\''")
+                        curl += f" \\\n  -F '{item.get('key')}={val}'"
+            else:
+                # Basic escaping for single quotes in body
+                safe_body = body.replace("'", "'\\''")
+                curl += f" \\\n  -d '{safe_body}'"
             
         from PySide6.QtGui import QGuiApplication
         from PySide6.QtWidgets import QMessageBox
@@ -273,21 +297,42 @@ class RequestPanel(QWidget):
         self.params_table.set_data(params)
         
         body_obj = data.get("body", "")
-        if isinstance(body_obj, dict):
+        if isinstance(body_obj, dict) and "mode" in body_obj:
             mode = body_obj.get("mode")
             if mode == "raw":
                 self.json_rb.setChecked(True)
                 self.body_stack.setCurrentIndex(1)
                 self.json_edit.setPlainText(body_obj.get("raw", ""))
+            elif mode == "formdata":
+                self.form_rb.setChecked(True)
+                self.body_stack.setCurrentIndex(2)
+                self.form_table.set_data(body_obj.get("formdata", []))
+            elif mode == "urlencoded":
+                self.urlencode_rb.setChecked(True)
+                self.body_stack.setCurrentIndex(3)
+                self.urlencode_table.set_data(body_obj.get("urlencoded", []))
             else:
                 self.none_rb.setChecked(True)
                 self.body_stack.setCurrentIndex(0)
         else:
             # History or internal format
-            self.json_edit.setPlainText(str(body_obj))
-            if body_obj:
+            body_type = data.get("body_type", "none")
+            if body_type == "raw JSON":
                 self.json_rb.setChecked(True)
                 self.body_stack.setCurrentIndex(1)
+                self.json_edit.setPlainText(str(body_obj))
+            elif body_type == "form-data":
+                self.form_rb.setChecked(True)
+                self.body_stack.setCurrentIndex(2)
+                self.form_table.set_data(body_obj if isinstance(body_obj, list) else [])
+            elif body_type == "x-www-form-urlencoded":
+                self.urlencode_rb.setChecked(True)
+                self.body_stack.setCurrentIndex(3)
+                self.urlencode_table.set_data(body_obj if isinstance(body_obj, dict) else {})
             else:
                 self.none_rb.setChecked(True)
                 self.body_stack.setCurrentIndex(0)
+        
+        # Restore pre-request script if available
+        script = data.get("pre_request_script", "")
+        self.prereq_editor.setPlainText(script)

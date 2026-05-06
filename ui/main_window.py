@@ -327,9 +327,26 @@ class MainWindow(QMainWindow):
         tab.request_panel.set_request_data(data)
         self.request_tabs.setTabText(self.request_tabs.currentIndex(), f"{data.get('method', 'GET')} {data.get('url', 'Request')[:20]}")
 
-    def on_send_request(self, tab, method, url, headers, body, params):
-        env_vars = self.get_current_env_vars()
+    def on_send_request(self, tab, method: str, url: str, headers: dict, body, params: dict, pre_script: str = ""):
+        env_vars = self.get_current_env_vars().copy()
         settings = get_settings()
+        
+        # === Run Pre-request Script ===
+        if pre_script and pre_script.strip():
+            try:
+                exec_globals = {"env": env_vars}
+                exec(pre_script, exec_globals)
+                # User may have modified env in-place or via exec_globals["env"]
+                env_vars = exec_globals.get("env", env_vars)
+                logger.info("Pre-request script executed successfully")
+            except Exception as e:
+                from PySide6.QtWidgets import QMessageBox
+                logger.error(f"Pre-request script error: {e}")
+                QMessageBox.warning(
+                    self, "Pre-request Script Error",
+                    f"Script execution failed:\n{type(e).__name__}: {e}\n\n"
+                    "The request will still be sent with the original environment."
+                )
         
         # Start with default headers from settings
         headers_final = settings.get("default_headers", {}).copy()

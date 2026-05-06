@@ -14,7 +14,7 @@ class HttpClientThread(QThread):
     finished = Signal(dict)
     error = Signal(str)
 
-    def __init__(self, method: str, url: str, headers: dict = None, body: str = None, params: dict = None, verify: bool = True, proxy: str = None, timeout: int = 60):
+    def __init__(self, method: str, url: str, headers: dict = None, body=None, params: dict = None, verify: bool = True, proxy: str = None, timeout: int = 60):
         super().__init__()
         self.method = method
         self.url = url
@@ -48,6 +48,7 @@ class HttpClientThread(QThread):
             self.error.emit(str(e))
 
     async def _execute_request(self) -> dict:
+        import os
         start_time = time.perf_counter()
         
         # Use httpx.AsyncClient with a default User-Agent, verify, and proxy
@@ -59,13 +60,69 @@ class HttpClientThread(QThread):
             verify=self.verify,
             proxy=self.proxy if self.proxy else None
         ) as client:
-            response = await client.request(
-                method=self.method,
-                url=self.url,
-                headers=self.headers,
-                content=self.body,
-                params=self.params
-            )
+            open_files = []
+            try:
+                if isinstance(self.body, list):
+                    data_fields = {}
+                    files_fields = {}
+                    for item in self.body:
+                        key = item.get("key")
+                        val = item.get("value")
+                        if not key: continue
+                        
+                        if item.get("type") == "File":
+                            if val and os.path.exists(val):
+                                f = open(val, "rb")
+                                open_files.append(f)
+                                files_fields[key] = (os.path.basename(val), f)
+                            else:
+                                logger.error(f"File not found or empty: {val}")
+                        else:
+                            data_fields[key] = str(val)
+                            
+                    # Remove content-type if we are sending files (httpx sets it to multipart/form-data with boundary)
+                    if files_fields:
+                        if "Content-Type" in self.headers:
+                            del self.headers["Content-Type"]
+                            
+                        response = await client.request(
+                            method=self.method,
+                            url=self.url,
+                            headers=self.headers,
+                            data=data_fields if data_fields else None,
+                            files=files_fields,
+                            params=self.params
+                        )
+                    elif data_fields:
+                        # Form data without files
+                        response = await client.request(
+                            method=self.method,
+                            url=self.url,
+                            headers=self.headers,
+                            data=data_fields,
+                            params=self.params
+                        )
+                    else:
+                        response = await client.request(
+                            method=self.method,
+                            url=self.url,
+                            headers=self.headers,
+                            params=self.params
+                        )
+                else:
+                    response = await client.request(
+                        method=self.method,
+                        url=self.url,
+                        headers=self.headers,
+                        content=self.body,
+                        params=self.params
+                    )
+            finally:
+                for f in open_files:
+                    try:
+                        f.close()
+                    except:
+                        pass
             
             end_time = time.perf_counter()
             elapsed_ms = int((end_time - start_time) * 1000)
