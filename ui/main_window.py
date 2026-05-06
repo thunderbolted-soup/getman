@@ -7,9 +7,13 @@ from ui.history_panel import HistoryPanel
 from ui.request_panel import RequestPanel
 from ui.response_panel import ResponsePanel
 from ui.log_viewer import LogViewer
+from ui.environment_widget import EnvironmentManagerWidget
+from ui.settings_widget import SettingsDialog
 from core.http_client import HttpClientThread
 from storage.history import add_to_history
 from core.collection import get_collections_list, load_collection, save_collection
+from core.environment import get_all_environments, apply_env, get_env_by_name
+from core.settings import get_settings
 from core.logger import get_logger
 
 logger = get_logger()
@@ -47,6 +51,26 @@ class MainWindow(QMainWindow):
         
         # Top bar
         top_bar = QHBoxLayout()
+        
+        # Environment selection
+        from PySide6.QtWidgets import QComboBox
+        top_bar.addWidget(QLabel("Env:"))
+        self.env_combo = QComboBox()
+        self.refresh_envs()
+        top_bar.addWidget(self.env_combo)
+        
+        self.env_settings_btn = QToolButton()
+        self.env_settings_btn.setText("⚙")
+        self.env_settings_btn.setToolTip("Manage Environments")
+        self.env_settings_btn.clicked.connect(self.manage_environments)
+        top_bar.addWidget(self.env_settings_btn)
+        
+        top_bar.addSpacing(10)
+        self.global_settings_btn = QPushButton("Settings")
+        self.global_settings_btn.clicked.connect(self.show_settings)
+        top_bar.addWidget(self.global_settings_btn)
+        
+        top_bar.addSpacing(20)
         top_bar.addStretch()
         
         self.hotkeys_btn = QPushButton("Hotkeys")
@@ -120,6 +144,29 @@ class MainWindow(QMainWindow):
         # Save Request: Ctrl+S (Cmd+S on Mac)
         self.save_shortcut = QShortcut(QKeySequence(QKeySequence.Save), self)
         self.save_shortcut.activated.connect(self.trigger_current_save)
+
+    def refresh_envs(self):
+        self.env_combo.clear()
+        self.env_combo.addItem("No Environment", None)
+        for env in get_all_environments():
+            self.env_combo.addItem(env["name"], env["values"])
+
+    def manage_environments(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Manage Environments")
+        dialog.resize(700, 450)
+        d_layout = QVBoxLayout(dialog)
+        manage_widget = EnvironmentManagerWidget()
+        manage_widget.changed.connect(self.refresh_envs)
+        d_layout.addWidget(manage_widget)
+        dialog.exec()
+
+    def show_settings(self):
+        dialog = SettingsDialog(self)
+        dialog.exec()
+
+    def get_current_env_vars(self) -> dict:
+        return self.env_combo.currentData() or {}
 
     def trigger_current_send(self):
         tab = self.current_tab()
@@ -239,9 +286,29 @@ class MainWindow(QMainWindow):
         self.request_tabs.setTabText(self.request_tabs.currentIndex(), f"{data.get('method', 'GET')} {data.get('url', 'Request')[:20]}")
 
     def on_send_request(self, tab, method, url, headers, body, params):
+        env_vars = self.get_current_env_vars()
+        settings = get_settings()
+        
+        # Apply environment variables to all fields
+        method = apply_env(method, env_vars)
+        url = apply_env(url, env_vars)
+        body = apply_env(body, env_vars)
+        
+        headers_final = {}
+        for k, v in headers.items():
+            headers_final[apply_env(k, env_vars)] = apply_env(v, env_vars)
+            
+        params_final = {}
+        for k, v in params.items():
+            params_final[apply_env(k, env_vars)] = apply_env(v, env_vars)
+
         logger.debug(f"Tab Sending: {method} {url}")
         tab.response_panel.status_label.setText("Sending...")
-        tab.request_thread = HttpClientThread(method, url, headers, body, params)
+        tab.request_thread = HttpClientThread(
+            method, url, headers_final, body, params_final,
+            verify=settings.get("verify_ssl", True),
+            proxy=settings.get("proxy_url", "")
+        )
         tab.request_thread.finished.connect(lambda res: self.on_request_finished(tab, res))
         tab.request_thread.error.connect(lambda err: self.on_request_error(tab, err))
         

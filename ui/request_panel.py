@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QHBoxLayout,
                              QPlainTextEdit, QRadioButton, QButtonGroup, QDialog, QStackedWidget)
 from PySide6.QtCore import Qt, Signal, QUrl
 from ui.auth_widget import AuthManagementWidget
+from ui.json_editor import CodeEditor
 from core.auth import get_auth_entries, get_last_auth_for_host, set_last_auth_for_host, get_auth_by_id
 
 class KeyValueTable(QTableWidget):
@@ -127,7 +128,7 @@ class RequestPanel(QWidget):
         self.body_stack.addWidget(QLabel("This request does not have a body."))
         
         # Raw JSON page
-        self.json_edit = QPlainTextEdit()
+        self.json_edit = CodeEditor()
         self.json_edit.setPlaceholderText('{\n  "key": "value"\n}')
         self.body_stack.addWidget(self.json_edit)
         

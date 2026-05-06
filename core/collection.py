@@ -36,12 +36,16 @@ def import_external_collection(source_path: str) -> Optional[str]:
     """Imports a collection from an external JSON file and saves it locally."""
     logger.info(f"Importing collection from: {source_path}")
     data = load_json(source_path)
+    
+    # Basic validation for Postman v2.1
     if not data or "info" not in data or "item" not in data:
         logger.error(f"Failed to import collection: Invalid format in {source_path}")
         return None
     
+    # We maintain the data structure as is, but we could sanitize it here if needed.
+    # The current UI already handles the item recursion.
+    
     name = data["info"].get("name", "Imported Collection")
-    # Basic filename sanitization
     safe_name = "".join([c for c in name if c.isalnum() or c in (' ', '_', '-')]).strip()
     filename = f"{safe_name}.json"
     

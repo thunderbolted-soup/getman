@@ -85,3 +85,12 @@
 16:32:49 [INFO] Application setup complete
 16:32:49 [INFO] Getman UI Initialized with Hotkeys and Improved UX
 16:32:49 [INFO] Starting Getman event loop
+16:46:25 [INFO] Application setup complete
+16:46:25 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+16:46:25 [INFO] Starting Getman event loop
+17:01:59 [INFO] Application setup complete
+17:01:59 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+17:01:59 [INFO] Starting Getman event loop
+17:02:12 [DEBUG] Tab Sending: GET https://httpbin.org/get
+17:02:12 [INFO] Starting request: GET https://httpbin.org/get
+17:02:14 [INFO] Response received: 200 (2029ms)

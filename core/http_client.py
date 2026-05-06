@@ -14,13 +14,15 @@ class HttpClientThread(QThread):
     finished = Signal(dict)
     error = Signal(str)
 
-    def __init__(self, method: str, url: str, headers: dict = None, body: str = None, params: dict = None):
+    def __init__(self, method: str, url: str, headers: dict = None, body: str = None, params: dict = None, verify: bool = True, proxy: str = None):
         super().__init__()
         self.method = method
         self.url = url
         self.headers = headers or {}
         self.body = body
         self.params = params
+        self.verify = verify
+        self.proxy = proxy
 
     def run(self):
         try:
@@ -47,11 +49,20 @@ class HttpClientThread(QThread):
     async def _execute_request(self) -> dict:
         start_time = time.perf_counter()
         
-        # Use httpx.AsyncClient with a default User-Agent
+        proxies = None
+        if self.proxy:
+            proxies = {
+                "http://": self.proxy,
+                "https://": self.proxy,
+            }
+
+        # Use httpx.AsyncClient with a default User-Agent, verify, and proxy
         async with httpx.AsyncClient(
             timeout=60.0, 
             follow_redirects=True,
-            headers={"User-Agent": "Postman/7.0.0"}
+            headers={"User-Agent": "Postman/7.0.0"},
+            verify=self.verify,
+            proxies=proxies
         ) as client:
             response = await client.request(
                 method=self.method,
