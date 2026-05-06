@@ -38,3 +38,50 @@
 15:49:41 [DEBUG] Tab Sending: GET https://google.com
 15:49:41 [INFO] Starting request: GET https://google.com
 15:49:43 [INFO] Response received: 200 (1606ms)
+15:55:50 [INFO] Application setup complete
+15:55:50 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+15:55:50 [INFO] Starting Getman event loop
+15:56:27 [DEBUG] Tab Sending: GET https://google.com
+15:56:27 [INFO] Starting request: GET https://google.com
+15:56:29 [INFO] Response received: 200 (1802ms)
+15:59:13 [INFO] Application setup complete
+15:59:13 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+15:59:13 [INFO] Starting Getman event loop
+15:59:17 [DEBUG] Tab Sending: GET https://google.com
+15:59:17 [INFO] Starting request: GET https://google.com
+15:59:18 [INFO] Response received: 200 (1690ms)
+16:00:18 [INFO] Imported cURL command
+16:02:40 [DEBUG] Tab Sending: POST 
+
+16:02:40 [INFO] Starting request: POST 
+
+16:02:40 [ERROR] Request failed: Invalid non-printable ASCII character in URL, '\n' at position 0.
+16:06:58 [INFO] Application setup complete
+16:06:58 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+16:06:58 [INFO] Starting Getman event loop
+16:07:07 [INFO] Imported cURL command
+16:18:30 [INFO] Application setup complete
+16:18:30 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+16:18:30 [INFO] Starting Getman event loop
+16:18:41 [INFO] Imported cURL command
+16:18:48 [DEBUG] Tab Sending: POST https://api.example.com/v2/orders/create
+16:18:48 [INFO] Starting request: POST https://api.example.com/v2/orders/create
+16:18:48 [ERROR] Request failed: [Errno -5] No address associated with hostname
+16:21:18 [INFO] Imported cURL command
+16:21:19 [DEBUG] Tab Sending: POST https://api.example.com/v2/orders/create
+16:21:19 [INFO] Starting request: POST https://api.example.com/v2/orders/create
+16:21:19 [ERROR] Request failed: [Errno -5] No address associated with hostname
+16:26:06 [INFO] Application setup complete
+16:26:06 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+16:26:06 [INFO] Starting Getman event loop
+16:26:17 [INFO] Imported cURL command
+16:26:18 [DEBUG] Tab Sending: POST https://api.example.com/v2/orders/create
+16:26:18 [INFO] Starting request: POST https://api.example.com/v2/orders/create
+16:26:18 [ERROR] Could not resolve hostname or connect to server.
+16:27:42 [INFO] Imported cURL command
+16:27:43 [DEBUG] Tab Sending: GET https://httpbin.org/get
+16:27:43 [INFO] Starting request: GET https://httpbin.org/get
+16:27:45 [INFO] Response received: 200 (1325ms)
+16:32:49 [INFO] Application setup complete
+16:32:49 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+16:32:49 [INFO] Starting Getman event loop
