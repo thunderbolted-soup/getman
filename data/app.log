@@ -94,3 +94,56 @@
 17:02:12 [DEBUG] Tab Sending: GET https://httpbin.org/get
 17:02:12 [INFO] Starting request: GET https://httpbin.org/get
 17:02:14 [INFO] Response received: 200 (2029ms)
+17:25:55 [INFO] Application setup complete
+17:25:58 [INFO] Application setup complete
+17:40:37 [INFO] Application setup complete
+17:40:37 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+17:40:37 [INFO] Starting Getman event loop
+17:40:42 [DEBUG] Tab Sending: GET https://httpbin.org/get
+17:40:42 [INFO] Starting request: GET https://httpbin.org/get
+17:40:42 [ERROR] Request failed: AsyncClient.__init__() got an unexpected keyword argument 'proxies'
+17:41:15 [DEBUG] Tab Sending: GET https://httpbin.org/get
+17:41:15 [INFO] Starting request: GET https://httpbin.org/get
+17:41:15 [ERROR] Request failed: AsyncClient.__init__() got an unexpected keyword argument 'proxies'
+17:41:15 [DEBUG] Tab Sending: GET https://httpbin.org/get
+17:41:15 [INFO] Starting request: GET https://httpbin.org/get
+17:41:15 [ERROR] Request failed: AsyncClient.__init__() got an unexpected keyword argument 'proxies'
+17:41:16 [DEBUG] Tab Sending: GET https://httpbin.org/get
+17:41:16 [INFO] Starting request: GET https://httpbin.org/get
+17:41:16 [ERROR] Request failed: AsyncClient.__init__() got an unexpected keyword argument 'proxies'
+17:41:17 [DEBUG] Tab Sending: GET https://httpbin.org/get
+17:41:17 [INFO] Starting request: GET https://httpbin.org/get
+17:41:17 [ERROR] Request failed: AsyncClient.__init__() got an unexpected keyword argument 'proxies'
+17:41:17 [DEBUG] Tab Sending: GET https://httpbin.org/get
+17:41:17 [INFO] Starting request: GET https://httpbin.org/get
+17:41:17 [ERROR] Request failed: AsyncClient.__init__() got an unexpected keyword argument 'proxies'
+17:43:30 [INFO] Application setup complete
+17:43:30 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+17:43:30 [INFO] Starting Getman event loop
+17:43:33 [DEBUG] Tab Sending: GET https://httpbin.org/get
+17:43:33 [INFO] Starting request: GET https://httpbin.org/get
+17:43:33 [ERROR] Request failed: AsyncClient.__init__() got an unexpected keyword argument 'proxies'
+17:43:40 [INFO] Application setup complete
+17:43:40 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+17:43:41 [INFO] Starting Getman event loop
+17:43:44 [DEBUG] Tab Sending: GET https://httpbin.org/get
+17:43:44 [INFO] Starting request: GET https://httpbin.org/get
+17:43:44 [ERROR] Request failed: AsyncClient.__init__() got an unexpected keyword argument 'proxies'
+17:58:53 [INFO] Application setup complete
+17:58:53 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+17:58:53 [INFO] Starting Getman event loop
+17:58:56 [DEBUG] Tab Sending: GET https://httpbin.org/get
+17:58:56 [INFO] Starting request: GET https://httpbin.org/get
+17:58:57 [INFO] Response received: 200 (1048ms)
+18:05:49 [INFO] Application setup complete
+18:05:49 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+18:05:49 [INFO] Starting Getman event loop
+19:16:32 [INFO] Application setup complete
+19:16:32 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+19:16:32 [INFO] Starting Getman event loop
+19:16:35 [DEBUG] Tab Sending: GET https://httpbin.org/get
+19:16:35 [INFO] Starting request: GET https://httpbin.org/get
+19:16:36 [INFO] Response received: 200 (1003ms)
+20:47:02 [INFO] Application setup complete
+20:47:02 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+20:47:02 [INFO] Starting Getman event loop

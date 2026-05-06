@@ -49,3 +49,10 @@ class HistoryPanel(QWidget):
     def on_clear_clicked(self):
         clear_history()
         self.refresh()
+
+    def filter_history(self, text):
+        text = text.lower()
+        for i in range(self.list.count()):
+            item = self.list.item(i)
+            match = text in item.text().lower()
+            item.setHidden(not match)

@@ -13,6 +13,10 @@ def get_history() -> List[Dict[str, Any]]:
 
 def add_to_history(request_data: Dict[str, Any]):
     """Adds a new request to history, keeping only the last MAX_HISTORY entries."""
+    from core.settings import get_settings
+    settings = get_settings()
+    max_size = settings.get("max_history_size", 100)
+    
     history = get_history()
     
     entry = {
@@ -28,7 +32,7 @@ def add_to_history(request_data: Dict[str, Any]):
     }
     
     history.insert(0, entry)
-    history = history[:MAX_HISTORY]
+    history = history[:max_size]
     
     save_json(HISTORY_FILE, history)
 

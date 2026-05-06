@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget,
                              QPushButton, QLineEdit, QLabel, QInputDialog, QListWidgetItem, QDialog)
 from PySide6.QtCore import Qt, Signal
 from core.environment import get_all_environments, save_environments
-from ui.request_panel import KeyValueTable
+from ui.shared_widgets import KeyValueTable
 
 class EnvironmentManagerWidget(QWidget):
     changed = Signal()

@@ -14,7 +14,7 @@ class HttpClientThread(QThread):
     finished = Signal(dict)
     error = Signal(str)
 
-    def __init__(self, method: str, url: str, headers: dict = None, body: str = None, params: dict = None, verify: bool = True, proxy: str = None):
+    def __init__(self, method: str, url: str, headers: dict = None, body: str = None, params: dict = None, verify: bool = True, proxy: str = None, timeout: int = 60):
         super().__init__()
         self.method = method
         self.url = url
@@ -23,6 +23,7 @@ class HttpClientThread(QThread):
         self.params = params
         self.verify = verify
         self.proxy = proxy
+        self.timeout = float(timeout)
 
     def run(self):
         try:
@@ -52,7 +53,7 @@ class HttpClientThread(QThread):
         # Use httpx.AsyncClient with a default User-Agent, verify, and proxy
         # Note: in httpx 0.28.1+ 'proxies' was removed in favor of 'proxy'
         async with httpx.AsyncClient(
-            timeout=60.0, 
+            timeout=self.timeout, 
             follow_redirects=True,
             headers={"User-Agent": "Postman/7.0.0"},
             verify=self.verify,

@@ -10,3 +10,5 @@ ENV/
 data/*.json
 data/collections/*.json
 !data/collections/.gitkeep
+advanced_getman_roadmap.md
+data/app.log

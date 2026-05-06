@@ -44,6 +44,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Getman")
         self.resize(1200, 900)
         
+        self.apply_theme()
+        
         self.log_viewer = LogViewer()
         
         central_widget = QWidget()
@@ -90,6 +92,16 @@ class MainWindow(QMainWindow):
         self.main_splitter.setStyleSheet("QSplitter::handle { background-color: #555; width: 3px; } QSplitter::handle:hover { background-color: #888; }")
         
         # Sidebar
+        self.sidebar_widget = QWidget()
+        sidebar_layout = QVBoxLayout(self.sidebar_widget)
+        sidebar_layout.setContentsMargins(0, 0, 0, 0)
+        
+        from PySide6.QtWidgets import QLineEdit
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search Collections & History...")
+        self.search_input.textChanged.connect(self.on_global_search)
+        sidebar_layout.addWidget(self.search_input)
+        
         self.sidebar_splitter = QSplitter(Qt.Vertical)
         self.sidebar_splitter.setStyleSheet("QSplitter::handle { background-color: #555; height: 3px; } QSplitter::handle:hover { background-color: #888; }")
         
@@ -97,6 +109,8 @@ class MainWindow(QMainWindow):
         self.history_panel = HistoryPanel()
         self.sidebar_splitter.addWidget(self.collection_tree)
         self.sidebar_splitter.addWidget(self.history_panel)
+        
+        sidebar_layout.addWidget(self.sidebar_splitter)
         
         # Request Tabs
         self.request_tabs = QTabWidget()
@@ -109,7 +123,7 @@ class MainWindow(QMainWindow):
         self.new_tab_btn.clicked.connect(self.add_new_tab)
         self.request_tabs.setCornerWidget(self.new_tab_btn, Qt.TopRightCorner)
         
-        self.main_splitter.addWidget(self.sidebar_splitter)
+        self.main_splitter.addWidget(self.sidebar_widget)
         self.main_splitter.addWidget(self.request_tabs)
         self.main_splitter.setSizes([300, 900])
         
@@ -163,7 +177,31 @@ class MainWindow(QMainWindow):
 
     def show_settings(self):
         dialog = SettingsDialog(self)
-        dialog.exec()
+        if dialog.exec():
+            self.apply_theme()
+
+    def apply_theme(self):
+        settings = get_settings()
+        theme = settings.get("theme", "dark")
+        if theme == "light":
+            # Simple light theme override
+            self.setStyleSheet("""
+                QMainWindow, QWidget { background-color: #f0f0f0; color: #000; }
+                QTabWidget::pane { border: 1px solid #ccc; }
+                QTabBar::tab { background: #ddd; color: #333; padding: 5px; }
+                QTabBar::tab:selected { background: #fff; }
+                QLineEdit, QPlainTextEdit, QTableWidget { background-color: #fff; color: #000; border: 1px solid #ccc; }
+            """)
+        else:
+            # Dark theme (default-ish)
+            self.setStyleSheet("""
+                QMainWindow, QWidget { background-color: #2b2b2b; color: #efefef; }
+                QTabWidget::pane { border: 1px solid #444; }
+                QTabBar::tab { background: #3c3f41; color: #bbb; padding: 5px; }
+                QTabBar::tab:selected { background: #4e5254; color: #fff; }
+                QLineEdit, QPlainTextEdit, QTableWidget { background-color: #3c3f41; color: #fff; border: 1px solid #555; }
+                QSplitter::handle { background-color: #555; }
+            """)
 
     def get_current_env_vars(self) -> dict:
         return self.env_combo.currentData() or {}
@@ -177,6 +215,10 @@ class MainWindow(QMainWindow):
         tab = self.current_tab()
         if tab:
             tab.request_panel.on_save_clicked()
+
+    def on_global_search(self, text):
+        self.collection_tree.filter_tree(text)
+        self.history_panel.filter_history(text)
 
     def show_hotkeys(self):
         hotkeys_text = (
@@ -289,15 +331,18 @@ class MainWindow(QMainWindow):
         env_vars = self.get_current_env_vars()
         settings = get_settings()
         
-        # Apply environment variables to all fields
+        # Start with default headers from settings
+        headers_final = settings.get("default_headers", {}).copy()
+        
+        # Overlay with tab headers (environment variables applied to both)
+        for k, v in headers.items():
+            headers_final[apply_env(k, env_vars)] = apply_env(v, env_vars)
+            
+        # Apply environment variables to other fields
         method = apply_env(method, env_vars)
         url = apply_env(url, env_vars)
         body = apply_env(body, env_vars)
         
-        headers_final = {}
-        for k, v in headers.items():
-            headers_final[apply_env(k, env_vars)] = apply_env(v, env_vars)
-            
         params_final = {}
         for k, v in params.items():
             params_final[apply_env(k, env_vars)] = apply_env(v, env_vars)
@@ -307,7 +352,8 @@ class MainWindow(QMainWindow):
         tab.request_thread = HttpClientThread(
             method, url, headers_final, body, params_final,
             verify=settings.get("verify_ssl", True),
-            proxy=settings.get("proxy_url", "")
+            proxy=settings.get("proxy_url", ""),
+            timeout=settings.get("request_timeout", 60)
         )
         tab.request_thread.finished.connect(lambda res: self.on_request_finished(tab, res))
         tab.request_thread.error.connect(lambda err: self.on_request_error(tab, err))
