@@ -10,6 +10,8 @@ from core.auth import get_auth_entries, get_last_auth_for_host, set_last_auth_fo
 
 class RequestPanel(QWidget):
     send_requested = Signal(str, str, dict, str, dict, str) # method, url, headers, body, params, pre_script
+    curl_requested = Signal(str, str, dict, object, dict, str) # method, url, headers, body, params, pre_script
+    cancel_requested = Signal()
     save_requested = Signal(dict)
 
     def __init__(self, parent=None):
@@ -151,6 +153,10 @@ class RequestPanel(QWidget):
                     self.auth_profile_combo.setCurrentIndex(index)
 
     def on_send_clicked(self):
+        if self.send_btn.text() == "Cancel":
+            self.cancel_requested.emit()
+            return
+
         method = self.method_combo.currentText()
         url = self.url_edit.text()
         headers = self.headers_table.get_data()
@@ -202,76 +208,34 @@ class RequestPanel(QWidget):
         url = self.url_edit.text()
         headers = self.headers_table.get_data()
         params = self.params_table.get_data()
+        pre_script = self.prereq_editor.toPlainText()
         
-        # Merge params into URL if they exist
-        if params:
-            from PySide6.QtCore import QUrlQuery
-            q_url = QUrl(url)
-            query = QUrlQuery(q_url.query())
-            for k, v in params.items():
-                query.addQueryItem(k, v)
-            q_url.setQuery(query)
-            url = q_url.toString()
+        body = None
+        if self.json_rb.isChecked(): 
+            body = self.json_edit.toPlainText()
+        elif self.form_rb.isChecked(): 
+            body = self.form_table.get_data()
+        elif self.urlencode_rb.isChecked(): 
+            body = self.urlencode_table.get_data()
+            
+        self.curl_requested.emit(method, url, headers, body, params, pre_script)
 
-        # Handle Auth headers
+    def set_sending_state(self, is_sending: bool):
+        if is_sending:
+            self.send_btn.setText("Cancel")
+            self.send_btn.setStyleSheet("background-color: #c0392b; color: white;")
+        else:
+            self.send_btn.setText("Send")
+            self.send_btn.setStyleSheet("")
+
+    def get_selected_auth(self):
         auth_id = self.auth_profile_combo.currentData()
         if auth_id:
-            auth_entry = get_auth_by_id(auth_id)
-            if auth_entry:
-                self.apply_auth(headers, auth_entry)
+            from core.auth import get_auth_by_id
+            return get_auth_by_id(auth_id)
+        return None
 
-        # Body logic (similar to on_send_clicked)
-        body = ""
-        if self.json_rb.isChecked():
-            body = self.json_edit.toPlainText()
-            if "Content-Type" not in headers:
-                headers["Content-Type"] = "application/json"
-        elif self.form_rb.isChecked():
-            form_items = self.form_table.get_data()
-            body = "form-data-objects" # Placeholder for cURL body
-        elif self.urlencode_rb.isChecked():
-            body = str(self.urlencode_table.get_data())
-            if "Content-Type" not in headers:
-                headers["Content-Type"] = "application/x-www-form-urlencoded"
 
-        # Build cURL string
-        curl = f"curl -X {method} '{url}'"
-        for k, v in headers.items():
-            curl += f" \\\n  -H '{k}: {v}'"
-        
-        if body:
-            if self.form_rb.isChecked():
-                for item in self.form_table.get_data():
-                    if item.get("type") == "File":
-                        curl += f" \\\n  -F '{item.get('key')}=@{item.get('value')}'"
-                    else:
-                        val = str(item.get('value')).replace("'", "'\\''")
-                        curl += f" \\\n  -F '{item.get('key')}={val}'"
-            else:
-                # Basic escaping for single quotes in body
-                safe_body = body.replace("'", "'\\''")
-                curl += f" \\\n  -d '{safe_body}'"
-            
-        from PySide6.QtGui import QGuiApplication
-        from PySide6.QtWidgets import QMessageBox
-        QGuiApplication.clipboard().setText(curl)
-        QMessageBox.information(self, "cURL Copied", "cURL command has been copied to clipboard.")
-
-    def apply_auth(self, headers, auth_entry):
-        import base64
-        a_type = auth_entry["type"]
-        data = auth_entry["data"]
-        if a_type == "bearer":
-            headers["Authorization"] = f"Bearer {data.get('token', '')}"
-        elif a_type == "basic":
-            user = data.get("username", "")
-            pw = data.get("password", "")
-            auth_str = base64.b64encode(f"{user}:{pw}".encode()).decode()
-            headers["Authorization"] = f"Basic {auth_str}"
-        elif a_type == "apikey":
-            key = data.get("key", "X-Api-Key")
-            val = data.get("value", "")
-            headers[key] = val
 
     def set_request_data(self, data: dict):
         method = data.get("method", "GET")

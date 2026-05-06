@@ -137,7 +137,10 @@ class CodeEditor(QPlainTextEdit):
         
         # Styling
         self.setFont(QFont("Courier New", 11))
-        self.setStyleSheet("background-color: #1e1e1e; color: #d4d4d4;")
+        self.setStyleSheet("""
+            CodeEditor { background-color: #1e1e1e; color: #d4d4d4; border: 1px solid #333; }
+            CodeEditor[error="true"] { background-color: #3d1e1e; border: 1px solid #f44336; }
+        """)
         self.highlighter = JsonHighlighter(self.document())
         
         # Validation
@@ -205,16 +208,17 @@ class CodeEditor(QPlainTextEdit):
 
     def validate_json(self):
         text = self.toPlainText().strip()
-        if not text:
-            self.setStyleSheet("background-color: #1e1e1e; color: #d4d4d4;")
-            return
-            
-        try:
-            json.loads(text)
-            self.setStyleSheet("background-color: #1e1e1e; color: #d4d4d4;")
-        except ValueError:
-            # Light red background on error
-            self.setStyleSheet("background-color: #3d1e1e; color: #d4d4d4;")
+        is_error = False
+        if text:
+            try:
+                json.loads(text)
+            except ValueError:
+                is_error = True
+        
+        if self.property("error") != is_error:
+            self.setProperty("error", is_error)
+            self.style().unpolish(self)
+            self.style().polish(self)
 
     def prettify(self):
         text = self.toPlainText().strip()

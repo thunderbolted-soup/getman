@@ -1,36 +1,45 @@
 from PySide6.QtWidgets import (QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, QWidget, QHBoxLayout, QLineEdit, QPushButton, QFileDialog)
 from PySide6.QtCore import Qt
 
-class KeyValueTable(QTableWidget):
-    def __init__(self, parent=None):
-        super().__init__(0, 3, parent)
-        self.setHorizontalHeaderLabels(["", "Key", "Value"])
+class BaseTable(QTableWidget):
+    """Base class for all key-value style tables with auto-adding rows."""
+    def __init__(self, columns: int, labels: list, parent=None):
+        super().__init__(0, columns, parent)
+        self.setHorizontalHeaderLabels(labels)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
         self.setColumnWidth(0, 30)
-        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.add_empty_row()
         self.itemChanged.connect(self.on_item_changed)
+
+    def _create_check_item(self):
+        check_item = QTableWidgetItem()
+        check_item.setCheckState(Qt.Checked)
+        check_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+        return check_item
 
     def add_empty_row(self):
         self.blockSignals(True)
         row = self.rowCount()
         self.insertRow(row)
-        
-        check_item = QTableWidgetItem()
-        check_item.setCheckState(Qt.Checked)
-        check_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-        self.setItem(row, 0, check_item)
-        
-        self.setItem(row, 1, QTableWidgetItem(""))
-        self.setItem(row, 2, QTableWidgetItem(""))
+        self.setItem(row, 0, self._create_check_item())
+        self.setup_empty_row(row)
         self.blockSignals(False)
 
+    def setup_empty_row(self, row):
+        """Override to initialize widgets/items in a new row."""
+        for col in range(1, self.columnCount()):
+            self.setItem(row, col, QTableWidgetItem(""))
+
     def on_item_changed(self, item):
-        if item.row() == self.rowCount() - 1:
-            key_item = self.item(item.row(), 1)
-            if key_item and key_item.text():
+        if item.row() == self.rowCount() - 1 and item.column() == 1:
+            if item.text():
                 self.add_empty_row()
+
+class KeyValueTable(BaseTable):
+    def __init__(self, parent=None):
+        super().__init__(3, ["", "Key", "Value"], parent)
+        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
 
     def get_data(self) -> dict:
         data = {}
@@ -45,49 +54,30 @@ class KeyValueTable(QTableWidget):
 
     def set_data(self, data: dict):
         self.setRowCount(0)
+        if not isinstance(data, dict): return
         for key, value in data.items():
             row = self.rowCount()
             self.insertRow(row)
-            check_item = QTableWidgetItem()
-            check_item.setCheckState(Qt.Checked)
-            check_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-            self.setItem(row, 0, check_item)
+            self.setItem(row, 0, self._create_check_item())
             self.setItem(row, 1, QTableWidgetItem(str(key)))
             self.setItem(row, 2, QTableWidgetItem(str(value)))
         self.add_empty_row()
 
-class FormDataTable(QTableWidget):
+class FormDataTable(BaseTable):
     def __init__(self, parent=None):
-        super().__init__(0, 4, parent)
-        self.setHorizontalHeaderLabels(["", "Key", "Type", "Value"])
-        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
-        self.setColumnWidth(0, 30)
+        super().__init__(4, ["", "Key", "Type", "Value"], parent)
         self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
         self.setColumnWidth(2, 80)
         self.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
-        self.add_empty_row()
-        self.itemChanged.connect(self.on_item_changed)
 
-    def add_empty_row(self):
-        self.blockSignals(True)
-        row = self.rowCount()
-        self.insertRow(row)
-        
-        check_item = QTableWidgetItem()
-        check_item.setCheckState(Qt.Checked)
-        check_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-        self.setItem(row, 0, check_item)
-        
+    def setup_empty_row(self, row):
         self.setItem(row, 1, QTableWidgetItem(""))
-        
         type_combo = QComboBox()
         type_combo.addItems(["Text", "File"])
         type_combo.currentTextChanged.connect(self.on_type_changed)
         self.setCellWidget(row, 2, type_combo)
-        
         self.setItem(row, 3, QTableWidgetItem(""))
-        self.blockSignals(False)
 
     def on_type_changed(self, type_text):
         combo = self.sender()
@@ -103,16 +93,12 @@ class FormDataTable(QTableWidget):
             file_widget = QWidget()
             layout = QHBoxLayout(file_widget)
             layout.setContentsMargins(0, 0, 0, 0)
-            
             line_edit = QLineEdit()
             line_edit.setReadOnly(True)
-            
             browse_btn = QPushButton("Browse...")
             browse_btn.clicked.connect(lambda: self.browse_file(line_edit))
-            
             layout.addWidget(line_edit)
             layout.addWidget(browse_btn)
-            
             self.setCellWidget(row, 3, file_widget)
         else:
             self.removeCellWidget(row, 3)
@@ -122,12 +108,6 @@ class FormDataTable(QTableWidget):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select File")
         if file_path:
             line_edit.setText(file_path)
-
-    def on_item_changed(self, item):
-        if item.row() == self.rowCount() - 1 and item.column() == 1:
-            key_item = self.item(item.row(), 1)
-            if key_item and key_item.text():
-                self.add_empty_row()
 
     def get_data(self) -> list:
         data = []
@@ -144,8 +124,7 @@ class FormDataTable(QTableWidget):
                         file_widget = self.cellWidget(row, 3)
                         if file_widget:
                             line_edit = file_widget.findChild(QLineEdit)
-                            if line_edit:
-                                value = line_edit.text()
+                            if line_edit: value = line_edit.text()
                     else:
                         val_item = self.item(row, 3)
                         value = val_item.text() if val_item else ""
@@ -155,23 +134,14 @@ class FormDataTable(QTableWidget):
 
     def set_data(self, data):
         self.setRowCount(0)
-        
-        # Backward compatibility if data is dict
         if isinstance(data, dict):
             data = [{"key": k, "type": "Text", "value": str(v)} for k, v in data.items()]
-            
-        if not isinstance(data, list):
-            data = []
+        if not isinstance(data, list): data = []
             
         for item in data:
             row = self.rowCount()
             self.insertRow(row)
-            
-            check_item = QTableWidgetItem()
-            check_item.setCheckState(Qt.Checked)
-            check_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-            self.setItem(row, 0, check_item)
-            
+            self.setItem(row, 0, self._create_check_item())
             self.setItem(row, 1, QTableWidgetItem(str(item.get("key", ""))))
             
             type_combo = QComboBox()
@@ -195,5 +165,4 @@ class FormDataTable(QTableWidget):
                 self.setCellWidget(row, 3, file_widget)
             else:
                 self.setItem(row, 3, QTableWidgetItem(str(item.get("value", ""))))
-                
         self.add_empty_row()

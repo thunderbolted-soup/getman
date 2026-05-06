@@ -97,9 +97,15 @@ class MainWindow(QMainWindow):
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         
         from PySide6.QtWidgets import QLineEdit
+        from PySide6.QtCore import QTimer
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search Collections & History...")
-        self.search_input.textChanged.connect(self.on_global_search)
+        
+        self.search_timer = QTimer()
+        self.search_timer.setSingleShot(True)
+        self.search_timer.timeout.connect(self.do_global_search)
+        self.search_input.textChanged.connect(lambda: self.search_timer.start(300))
+        
         sidebar_layout.addWidget(self.search_input)
         
         self.sidebar_splitter = QSplitter(Qt.Vertical)
@@ -216,7 +222,8 @@ class MainWindow(QMainWindow):
         if tab:
             tab.request_panel.on_save_clicked()
 
-    def on_global_search(self, text):
+    def do_global_search(self):
+        text = self.search_input.text()
         self.collection_tree.filter_tree(text)
         self.history_panel.filter_history(text)
 
@@ -301,6 +308,8 @@ class MainWindow(QMainWindow):
         
         # Connect signals for the new tab
         tab.request_panel.send_requested.connect(lambda *args: self.on_send_request(tab, *args))
+        tab.request_panel.curl_requested.connect(lambda *args: self.on_curl_request(tab, *args))
+        tab.request_panel.cancel_requested.connect(lambda: self.on_cancel_request(tab))
         tab.request_panel.save_requested.connect(lambda data: self.on_save_request(tab, data))
         return tab
 
@@ -328,46 +337,33 @@ class MainWindow(QMainWindow):
         self.request_tabs.setTabText(self.request_tabs.currentIndex(), f"{data.get('method', 'GET')} {data.get('url', 'Request')[:20]}")
 
     def on_send_request(self, tab, method: str, url: str, headers: dict, body, params: dict, pre_script: str = ""):
-        env_vars = self.get_current_env_vars().copy()
+        from core.request_preparer import prepare_request
+        env_vars = self.get_current_env_vars()
         settings = get_settings()
         
-        # === Run Pre-request Script ===
-        if pre_script and pre_script.strip():
-            try:
-                exec_globals = {"env": env_vars}
-                exec(pre_script, exec_globals)
-                # User may have modified env in-place or via exec_globals["env"]
-                env_vars = exec_globals.get("env", env_vars)
-                logger.info("Pre-request script executed successfully")
-            except Exception as e:
-                from PySide6.QtWidgets import QMessageBox
-                logger.error(f"Pre-request script error: {e}")
-                QMessageBox.warning(
-                    self, "Pre-request Script Error",
-                    f"Script execution failed:\n{type(e).__name__}: {e}\n\n"
-                    "The request will still be sent with the original environment."
-                )
+        auth_profile = tab.request_panel.get_selected_auth()
         
-        # Start with default headers from settings
-        headers_final = settings.get("default_headers", {}).copy()
-        
-        # Overlay with tab headers (environment variables applied to both)
-        for k, v in headers.items():
-            headers_final[apply_env(k, env_vars)] = apply_env(v, env_vars)
-            
-        # Apply environment variables to other fields
-        method = apply_env(method, env_vars)
-        url = apply_env(url, env_vars)
-        body = apply_env(body, env_vars)
-        
-        params_final = {}
-        for k, v in params.items():
-            params_final[apply_env(k, env_vars)] = apply_env(v, env_vars)
+        # Centralized preparation
+        prep = prepare_request(
+            method=method,
+            url=url,
+            headers=headers,
+            body=body,
+            params=params,
+            env_vars=env_vars,
+            pre_script=pre_script,
+            default_headers=settings.get("default_headers"),
+            auth_entry=auth_profile
+        )
 
-        logger.debug(f"Tab Sending: {method} {url}")
+        logger.debug(f"Tab Sending: {prep.method} {prep.url}")
         tab.response_panel.status_label.setText("Sending...")
         tab.request_thread = HttpClientThread(
-            method, url, headers_final, body, params_final,
+            method=prep.method,
+            url=prep.url,
+            headers=prep.headers,
+            body=prep.body,
+            params=prep.params,
             verify=settings.get("verify_ssl", True),
             proxy=settings.get("proxy_url", ""),
             timeout=settings.get("request_timeout", 60)
@@ -375,11 +371,42 @@ class MainWindow(QMainWindow):
         tab.request_thread.finished.connect(lambda res: self.on_request_finished(tab, res))
         tab.request_thread.error.connect(lambda err: self.on_request_error(tab, err))
         
-        tab.request_panel.send_btn.setEnabled(False)
+        tab.request_panel.set_sending_state(True)
         tab.request_thread.start()
 
+    def on_cancel_request(self, tab):
+        if tab.request_thread and tab.request_thread.isRunning():
+            tab.request_thread.cancel()
+            tab.request_panel.set_sending_state(False)
+            tab.response_panel.status_label.setText("Status: Cancelled")
+            logger.info("User cancelled the request")
+
+    def on_curl_request(self, tab, method, url, headers, body, params, pre_script):
+        from core.request_preparer import prepare_request, generate_curl
+        env_vars = self.get_current_env_vars()
+        settings = get_settings()
+        auth_profile = tab.request_panel.get_selected_auth()
+        
+        prep = prepare_request(
+            method=method,
+            url=url,
+            headers=headers,
+            body=body,
+            params=params,
+            env_vars=env_vars,
+            pre_script=pre_script,
+            default_headers=settings.get("default_headers"),
+            auth_entry=auth_profile
+        )
+        curl = generate_curl(prep)
+        
+        from PySide6.QtGui import QGuiApplication
+        from PySide6.QtWidgets import QMessageBox
+        QGuiApplication.clipboard().setText(curl)
+        QMessageBox.information(self, "cURL Copied", "cURL command has been copied to clipboard (environment variables applied).")
+
     def on_request_finished(self, tab, result):
-        tab.request_panel.send_btn.setEnabled(True)
+        tab.request_panel.set_sending_state(False)
         tab.response_panel.set_response(result)
         
         history_entry = {
@@ -395,7 +422,7 @@ class MainWindow(QMainWindow):
         self.history_panel.refresh()
 
     def on_request_error(self, tab, error_msg):
-        tab.request_panel.send_btn.setEnabled(True)
+        tab.request_panel.set_sending_state(False)
         tab.response_panel.set_error(error_msg)
 
     def on_save_request(self, tab, data):
