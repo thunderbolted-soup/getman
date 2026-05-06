@@ -172,12 +172,20 @@ class MainWindow(QMainWindow):
                             k, v = h.split(":", 1)
                             headers[k.strip()] = v.strip()
                         i += 1
-                    elif p in ("-d", "--data", "--data-raw") and i + 1 < len(parts):
+                    elif p in ("-d", "--data", "--data-raw", "--data-binary", "--data-urlencode") and i + 1 < len(parts):
                         data = parts[i+1]
                         if method == "GET": method = "POST"
                         i += 1
+                    elif p in ("-u", "--user", "-A", "--user-agent", "-e", "--referer", "-o", "--output", "-F", "--form", "-b", "--cookie", "-c", "--cookie-jar", "--url") and i + 1 < len(parts):
+                        # Skip flags that take an argument
+                        i += 1
+                    elif p.startswith("--url="):
+                        if not url:
+                            url = p.split("=", 1)[1]
                     elif not p.startswith("-"):
-                        url = p
+                        # First positional argument that isn't a flag or an argument to a recognized flag is the URL
+                        if not url:
+                            url = p
                     i += 1
                 
                 if not url:
