@@ -28,6 +28,18 @@ class HttpClientThread(QThread):
             # Execute the async request in a new event loop for this thread
             result = asyncio.run(self._execute_request())
             self.finished.emit(result)
+        except httpx.ConnectError:
+            msg = "Could not resolve hostname or connect to server."
+            logger.error(msg)
+            self.error.emit(msg)
+        except httpx.ConnectTimeout:
+            msg = "Connection timed out."
+            logger.error(msg)
+            self.error.emit(msg)
+        except httpx.ReadTimeout:
+            msg = "Server took too long to respond (Read Timeout)."
+            logger.error(msg)
+            self.error.emit(msg)
         except Exception as e:
             logger.error(f"Request failed: {str(e)}")
             self.error.emit(str(e))
