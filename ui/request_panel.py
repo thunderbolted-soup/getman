@@ -82,10 +82,15 @@ class RequestPanel(QWidget):
         self.save_btn = QPushButton("Save")
         self.save_btn.clicked.connect(self.on_save_clicked)
         
+        self.curl_btn = QPushButton("cURL")
+        self.curl_btn.setToolTip("Copy as cURL")
+        self.curl_btn.clicked.connect(self.on_copy_curl_clicked)
+        
         url_layout.addWidget(self.method_combo)
         url_layout.addWidget(self.url_edit)
         url_layout.addWidget(self.send_btn)
         url_layout.addWidget(self.save_btn)
+        url_layout.addWidget(self.curl_btn)
         layout.addLayout(url_layout)
         
         # Tabs
@@ -229,6 +234,57 @@ class RequestPanel(QWidget):
             "body": self.json_edit.toPlainText() if self.json_rb.isChecked() else ""
         }
         self.save_requested.emit(data)
+
+    def on_copy_curl_clicked(self):
+        method = self.method_combo.currentText()
+        url = self.url_edit.text()
+        headers = self.headers_table.get_data()
+        params = self.params_table.get_data()
+        
+        # Merge params into URL if they exist
+        if params:
+            from PySide6.QtCore import QUrlQuery
+            q_url = QUrl(url)
+            query = QUrlQuery(q_url.query())
+            for k, v in params.items():
+                query.addQueryItem(k, v)
+            q_url.setQuery(query)
+            url = q_url.toString()
+
+        # Handle Auth headers
+        auth_id = self.auth_profile_combo.currentData()
+        if auth_id:
+            auth_entry = get_auth_by_id(auth_id)
+            if auth_entry:
+                self.apply_auth(headers, auth_entry)
+
+        # Body logic (similar to on_send_clicked)
+        body = ""
+        if self.json_rb.isChecked():
+            body = self.json_edit.toPlainText()
+            if "Content-Type" not in headers:
+                headers["Content-Type"] = "application/json"
+        elif self.form_rb.isChecked():
+            body = str(self.form_table.get_data())
+        elif self.urlencode_rb.isChecked():
+            body = str(self.urlencode_table.get_data())
+            if "Content-Type" not in headers:
+                headers["Content-Type"] = "application/x-www-form-urlencoded"
+
+        # Build cURL string
+        curl = f"curl -X {method} '{url}'"
+        for k, v in headers.items():
+            curl += f" \\\n  -H '{k}: {v}'"
+        
+        if body:
+            # Basic escaping for single quotes in body
+            safe_body = body.replace("'", "'\\''")
+            curl += f" \\\n  -d '{safe_body}'"
+            
+        from PySide6.QtGui import QGuiApplication
+        from PySide6.QtWidgets import QMessageBox
+        QGuiApplication.clipboard().setText(curl)
+        QMessageBox.information(self, "cURL Copied", "cURL command has been copied to clipboard.")
 
     def apply_auth(self, headers, auth_entry):
         import base64
