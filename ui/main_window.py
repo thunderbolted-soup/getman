@@ -4,6 +4,8 @@ from ui.collection_tree import CollectionTreeWidget
 from ui.history_panel import HistoryPanel
 from ui.request_panel import RequestPanel
 from ui.response_panel import ResponsePanel
+from core.http_client import HttpClientThread
+from storage.history import add_to_history
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -42,3 +44,35 @@ class MainWindow(QMainWindow):
         self.content_splitter.setSizes([300, 500])
         
         main_layout.addWidget(self.main_splitter)
+
+        # Connections
+        self.request_panel.send_requested.connect(self.on_send_request)
+
+    def on_send_request(self, method, url, headers, body, params):
+        self.response_panel.status_label.setText("Sending...")
+        self.request_thread = HttpClientThread(method, url, headers, body, params)
+        self.request_thread.finished.connect(self.on_request_finished)
+        self.request_thread.error.connect(self.on_request_error)
+        
+        self.request_panel.send_btn.setEnabled(False)
+        self.request_thread.start()
+
+    def on_request_finished(self, result):
+        self.request_panel.send_btn.setEnabled(True)
+        self.response_panel.set_response(result)
+        
+        # Save to history
+        history_entry = {
+            "method": self.request_thread.method,
+            "url": self.request_thread.url,
+            "headers": self.request_thread.headers,
+            "body": self.request_thread.body,
+            "response_status": result["status_code"],
+            "response_time_ms": result["elapsed_ms"]
+        }
+        add_to_history(history_entry)
+        # Update history UI (will be implemented in Phase 4)
+
+    def on_request_error(self, error_msg):
+        self.request_panel.send_btn.setEnabled(True)
+        self.response_panel.set_error(error_msg)
