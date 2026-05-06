@@ -49,20 +49,14 @@ class HttpClientThread(QThread):
     async def _execute_request(self) -> dict:
         start_time = time.perf_counter()
         
-        proxies = None
-        if self.proxy:
-            proxies = {
-                "http://": self.proxy,
-                "https://": self.proxy,
-            }
-
         # Use httpx.AsyncClient with a default User-Agent, verify, and proxy
+        # Note: in httpx 0.28.1+ 'proxies' was removed in favor of 'proxy'
         async with httpx.AsyncClient(
             timeout=60.0, 
             follow_redirects=True,
             headers={"User-Agent": "Postman/7.0.0"},
             verify=self.verify,
-            proxies=proxies
+            proxy=self.proxy if self.proxy else None
         ) as client:
             response = await client.request(
                 method=self.method,
