@@ -1,7 +1,8 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QTreeWidget, 
                              QTreeWidgetItem, QMenu, QFileDialog, QPushButton, QHBoxLayout, QInputDialog)
 from PySide6.QtCore import Signal, Qt
-from core.collection import get_collections_list, load_collection, import_external_collection, delete_collection
+from core.collection import (get_collections_list, load_collection, import_external_collection, 
+                            delete_collection, create_new_collection)
 
 class CollectionTreeWidget(QWidget):
     request_selected = Signal(dict)
@@ -13,8 +14,11 @@ class CollectionTreeWidget(QWidget):
         header_layout = QHBoxLayout()
         header_layout.addWidget(QLabel("Collections"))
         header_layout.addStretch()
+        self.new_btn = QPushButton("New")
+        self.new_btn.clicked.connect(self.on_new_collection_clicked)
         self.import_btn = QPushButton("Import")
         self.import_btn.clicked.connect(self.on_import_clicked)
+        header_layout.addWidget(self.new_btn)
         header_layout.addWidget(self.import_btn)
         layout.addLayout(header_layout)
         
@@ -143,6 +147,12 @@ class CollectionTreeWidget(QWidget):
         file_path, _ = QFileDialog.getOpenFileName(self, "Import Collection", "", "JSON Files (*.json)")
         if file_path:
             import_external_collection(file_path)
+            self.refresh()
+
+    def on_new_collection_clicked(self):
+        name, ok = QInputDialog.getText(self, "New Collection", "Collection name:")
+        if ok and name:
+            create_new_collection(name)
             self.refresh()
 
     def on_context_menu(self, pos):

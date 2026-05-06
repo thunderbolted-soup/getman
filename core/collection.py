@@ -66,3 +66,26 @@ def delete_collection(filename: str):
     if os.path.exists(path):
         logger.warning(f"Deleting collection: {filename}")
         os.remove(path)
+
+def create_new_collection(name: str) -> str:
+    """Creates a new empty collection with the given name."""
+    data = {
+        "info": {
+            "name": name,
+            "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+        },
+        "item": []
+    }
+    safe_name = "".join([c for c in name if c.isalnum() or c in (' ', '_', '-')]).strip().replace(' ', '_')
+    if not safe_name: safe_name = "new_collection"
+    filename = f"{safe_name}.json"
+    
+    # Avoid collisions
+    base_name = safe_name
+    counter = 1
+    while os.path.exists(os.path.join(COLLECTIONS_DIR, filename)):
+        filename = f"{base_name}_{counter}.json"
+        counter += 1
+        
+    save_collection(filename, data)
+    return filename
