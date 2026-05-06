@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (QMainWindow, QSplitter, QWidget, QVBoxLayout, 
                              QPushButton, QHBoxLayout, QTabWidget, QInputDialog, QMessageBox, QToolButton)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QKeySequence
+from PySide6.QtGui import QAction, QShortcut
 from ui.collection_tree import CollectionTreeWidget
 from ui.history_panel import HistoryPanel
 from ui.request_panel import RequestPanel
@@ -48,6 +49,10 @@ class MainWindow(QMainWindow):
         top_bar = QHBoxLayout()
         top_bar.addStretch()
         
+        self.hotkeys_btn = QPushButton("Hotkeys")
+        self.hotkeys_btn.clicked.connect(self.show_hotkeys)
+        top_bar.addWidget(self.hotkeys_btn)
+        
         self.import_curl_btn = QPushButton("Import cURL")
         self.import_curl_btn.clicked.connect(self.import_curl)
         top_bar.addWidget(self.import_curl_btn)
@@ -91,9 +96,51 @@ class MainWindow(QMainWindow):
         
         # Global connections
         self.collection_tree.request_selected.connect(self.load_request)
-        self.history_panel.request_selected.connect(self.load_request)
+        self.history_panel.request_selected.connect(self.load_request_new_tab)
         
-        logger.info("Getman UI Initialized with Tab Support")
+        # Global Hotkeys
+        self.setup_hotkeys()
+        
+        logger.info("Getman UI Initialized with Hotkeys and Improved UX")
+
+    def setup_hotkeys(self):
+        # New Tab: Ctrl+T (Cmd+T on Mac)
+        self.new_tab_shortcut = QShortcut(QKeySequence(QKeySequence.AddTab), self)
+        self.new_tab_shortcut.activated.connect(self.add_new_tab)
+        
+        # Close Tab: Ctrl+W (Cmd+W on Mac)
+        self.close_tab_shortcut = QShortcut(QKeySequence(QKeySequence.Close), self)
+        self.close_tab_shortcut.activated.connect(lambda: self.close_tab(self.request_tabs.currentIndex()))
+        
+        # Send Request: Ctrl+Enter (Cmd+Enter on Mac)
+        # Using custom sequence since there's no standard for "Send"
+        self.send_shortcut = QShortcut(QKeySequence("Ctrl+Return"), self)
+        self.send_shortcut.activated.connect(self.trigger_current_send)
+        
+        # Save Request: Ctrl+S (Cmd+S on Mac)
+        self.save_shortcut = QShortcut(QKeySequence(QKeySequence.Save), self)
+        self.save_shortcut.activated.connect(self.trigger_current_save)
+
+    def trigger_current_send(self):
+        tab = self.current_tab()
+        if tab:
+            tab.request_panel.on_send_clicked()
+
+    def trigger_current_save(self):
+        tab = self.current_tab()
+        if tab:
+            tab.request_panel.on_save_clicked()
+
+    def show_hotkeys(self):
+        hotkeys_text = (
+            "<b>Global Hotkeys:</b><br><br>"
+            "Ctrl+T : New Tab<br>"
+            "Ctrl+W : Close Tab<br>"
+            "Ctrl+S : Save Request<br>"
+            "Ctrl+Enter : Send Request<br><br>"
+            "<i>(On macOS, use Command instead of Ctrl)</i>"
+        )
+        QMessageBox.information(self, "Getman Hotkeys", hotkeys_text)
 
     def closeEvent(self, event):
         self.log_viewer.close()
@@ -137,7 +184,7 @@ class MainWindow(QMainWindow):
                     raise ValueError("No URL found in cURL command")
                     
                 req_data = {"method": method, "url": url, "headers": headers, "body": {"mode": "raw", "raw": data} if data else ""}
-                self.load_request(req_data)
+                self.load_request_new_tab(req_data)
                 logger.info("Imported cURL command")
             except Exception as e:
                 QMessageBox.warning(self, "Import Error", f"Failed to parse cURL: {str(e)}")
@@ -158,6 +205,7 @@ class MainWindow(QMainWindow):
         # Connect signals for the new tab
         tab.request_panel.send_requested.connect(lambda *args: self.on_send_request(tab, *args))
         tab.request_panel.save_requested.connect(lambda data: self.on_save_request(tab, data))
+        return tab
 
     def close_tab(self, index):
         if self.request_tabs.count() > 1:
@@ -173,8 +221,12 @@ class MainWindow(QMainWindow):
     def load_request(self, data):
         tab = self.current_tab()
         if not tab:
-            self.add_new_tab()
-            tab = self.current_tab()
+            tab = self.add_new_tab()
+        tab.request_panel.set_request_data(data)
+        self.request_tabs.setTabText(self.request_tabs.currentIndex(), f"{data.get('method', 'GET')} {data.get('url', 'Request')[:20]}")
+
+    def load_request_new_tab(self, data):
+        tab = self.add_new_tab()
         tab.request_panel.set_request_data(data)
         self.request_tabs.setTabText(self.request_tabs.currentIndex(), f"{data.get('method', 'GET')} {data.get('url', 'Request')[:20]}")
 

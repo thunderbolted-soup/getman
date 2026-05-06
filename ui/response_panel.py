@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QHBoxLayout,
                              QTabWidget, QTextEdit, QTableWidget, QTableWidgetItem, 
                              QHeaderView, QPushButton, QRadioButton, QButtonGroup)
 from PySide6.QtGui import QFont, QGuiApplication
+from PySide6.QtCore import Qt
 from pygments import highlight
 from pygments.lexers import JsonLexer, XmlLexer, HttpLexer, TextLexer, HtmlLexer
 from pygments.formatters import HtmlFormatter
@@ -10,8 +11,7 @@ from pygments.formatters import HtmlFormatter
 class ResponsePanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.raw_content = b""
-        self.is_pretty = True
+        self.last_response = {}
         
         layout = QVBoxLayout(self)
         
@@ -38,6 +38,10 @@ class ResponsePanel(QWidget):
         self.view_group.addButton(self.pretty_btn)
         self.view_group.addButton(self.raw_btn)
         
+        self.wrap_btn = QPushButton("Wrap")
+        self.wrap_btn.setCheckable(True)
+        self.wrap_btn.clicked.connect(self.on_wrap_toggled)
+        
         self.prettify_btn = QPushButton("Prettify")
         self.prettify_btn.clicked.connect(self.on_prettify_clicked)
         
@@ -46,7 +50,9 @@ class ResponsePanel(QWidget):
         
         controls_layout.addWidget(self.pretty_btn)
         controls_layout.addWidget(self.raw_btn)
-        controls_layout.addSpacing(20)
+        controls_layout.addSpacing(10)
+        controls_layout.addWidget(self.wrap_btn)
+        controls_layout.addSpacing(10)
         controls_layout.addWidget(self.prettify_btn)
         controls_layout.addStretch()
         controls_layout.addWidget(self.copy_btn)
@@ -59,6 +65,7 @@ class ResponsePanel(QWidget):
         self.body_edit = QTextEdit()
         self.body_edit.setReadOnly(True)
         self.body_edit.setFont(QFont("Courier New", 10))
+        self.body_edit.setLineWrapMode(QTextEdit.NoWrap)
         self.tabs.addTab(self.body_edit, "Body")
         
         # Headers Tab
@@ -68,12 +75,9 @@ class ResponsePanel(QWidget):
         self.tabs.addTab(self.headers_table, "Headers")
         
         layout.addWidget(self.tabs)
-        
-        self.last_response = {}
 
     def set_response(self, response_data: dict):
         self.last_response = response_data
-        self.raw_content = response_data.get("content", b"")
         
         # Update labels
         status_code = response_data.get("status_code", "-")
@@ -132,17 +136,34 @@ class ResponsePanel(QWidget):
             elif "application/xml" in content_type or "text/xml" in content_type:
                 lexer = XmlLexer()
             
-            formatter = HtmlFormatter(nowrap=False, style='friendly')
+            # Fix highlighting: wrap in a div and ensure CSS is properly applied
+            formatter = HtmlFormatter(nowrap=False, style='monokai', noclasses=True)
             highlighted = highlight(text, lexer, formatter)
-            css = formatter.get_style_defs()
-            html = f"<html><head><style>{css}</style></head><body>{highlighted}</body></html>"
+            # Use monokai style for dark background look or stick to inline styles (noclasses=True)
+            # When noclasses=True, HtmlFormatter injects styles directly into elements.
+            
+            bg_color = "#272822" if self.pretty_btn.isChecked() else "white"
+            text_color = "#f8f8f2" if self.pretty_btn.isChecked() else "black"
+            
+            html = f"""
+            <html>
+            <body style="background-color: {bg_color}; color: {text_color}; margin: 0; padding: 10px; font-family: 'Courier New';">
+                {highlighted}
+            </body>
+            </html>
+            """
             self.body_edit.setHtml(html)
         else:
-            # Raw view
             self.body_edit.setPlainText(text)
 
     def on_view_mode_changed(self):
         self.refresh_view()
+
+    def on_wrap_toggled(self, checked):
+        if checked:
+            self.body_edit.setLineWrapMode(QTextEdit.WidgetWidth)
+        else:
+            self.body_edit.setLineWrapMode(QTextEdit.NoWrap)
 
     def on_prettify_clicked(self):
         if not self.last_response:

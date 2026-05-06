@@ -26,3 +26,15 @@
 15:44:33 [INFO] Application setup complete
 15:44:33 [INFO] Getman UI Initialized with Tab Support
 15:44:33 [INFO] Starting Getman event loop
+15:45:47 [INFO] Application setup complete
+15:45:47 [INFO] Getman UI Initialized with Tab Support
+15:45:47 [INFO] Starting Getman event loop
+15:45:59 [DEBUG] Tab Sending: GET https://google.com
+15:45:59 [INFO] Starting request: GET https://google.com
+15:46:14 [INFO] Response received: 200 (14793ms)
+15:47:55 [INFO] Application setup complete
+15:47:55 [INFO] Getman UI Initialized with Tab Support
+15:47:55 [INFO] Starting Getman event loop
+15:49:41 [DEBUG] Tab Sending: GET https://google.com
+15:49:41 [INFO] Starting request: GET https://google.com
+15:49:43 [INFO] Response received: 200 (1606ms)
