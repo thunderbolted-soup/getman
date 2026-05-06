@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import (QMainWindow, QSplitter, QWidget, QVBoxLayout, 
-                             QPushButton, QHBoxLayout, QTabWidget, QInputDialog, QMessageBox, QToolButton)
+                             QPushButton, QHBoxLayout, QTabWidget, QInputDialog, 
+                             QMessageBox, QToolButton, QLabel, QComboBox)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QShortcut, QKeySequence
 from ui.collection_tree import CollectionTreeWidget
@@ -53,7 +54,6 @@ class MainWindow(QMainWindow):
         top_bar = QHBoxLayout()
         
         # Environment selection
-        from PySide6.QtWidgets import QComboBox
         top_bar.addWidget(QLabel("Env:"))
         self.env_combo = QComboBox()
         self.refresh_envs()
