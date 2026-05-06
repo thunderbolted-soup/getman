@@ -34,12 +34,14 @@ class JsonHighlighter(QSyntaxHighlighter):
             self.setFormat(match.start(), 1, self.formats["bracket"])
             
         # Strings / Keys
-        # This regex distinguishes between "key": and "value"
-        for match in re.finditer(r'"(.*?)"(?=\s*:)', text):
-            self.setFormat(match.start(), match.end() - match.start(), self.formats["key"])
+        # Use capturing groups to avoid variable-width look-behind issues
+        # Highlight Keys: "key":
+        for match in re.finditer(r'("(.*?)")\s*:', text):
+            self.setFormat(match.start(1), match.end(1) - match.start(1), self.formats["key"])
             
-        for match in re.finditer(r'(?<=:\s*)"(.*?)"', text):
-            self.setFormat(match.start(), match.end() - match.start(), self.formats["string"])
+        # Highlight String Values: : "value"
+        for match in re.finditer(r':\s*("(.*?)")', text):
+            self.setFormat(match.start(1), match.end(1) - match.start(1), self.formats["string"])
             
         # Numbers
         for match in re.finditer(r"\b\d+(\.\d+)?\b", text):
