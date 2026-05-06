@@ -7,3 +7,22 @@
 15:22:11 [INFO] Application setup complete
 15:22:11 [INFO] Getman UI Initialized
 15:22:11 [INFO] Starting Getman event loop
+15:27:34 [INFO] Application setup complete
+15:27:34 [INFO] Getman UI Initialized with Tab Support
+15:27:34 [INFO] Starting Getman event loop
+15:28:20 [DEBUG] Tab Sending: GET https://google.com
+15:28:20 [INFO] Starting request: GET https://google.com
+15:28:21 [INFO] Response received: 200 (1267ms)
+15:28:22 [WARNING] No collections found to save into
+15:28:25 [WARNING] No collections found to save into
+15:28:25 [WARNING] No collections found to save into
+15:28:25 [WARNING] No collections found to save into
+15:32:43 [DEBUG] Tab Sending: GET https://api.google.com
+15:32:43 [INFO] Starting request: GET https://api.google.com
+15:32:44 [INFO] Response received: 404 (1043ms)
+15:34:44 [INFO] Application setup complete
+15:34:44 [INFO] Getman UI Initialized with Tab Support
+15:34:44 [INFO] Starting Getman event loop
+15:44:33 [INFO] Application setup complete
+15:44:33 [INFO] Getman UI Initialized with Tab Support
+15:44:33 [INFO] Starting Getman event loop

@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QHBoxLayout,
                              QHeaderView, QPushButton, QRadioButton, QButtonGroup)
 from PySide6.QtGui import QFont, QGuiApplication
 from pygments import highlight
-from pygments.lexers import JsonLexer, XmlLexer, HttpLexer, TextLexer
+from pygments.lexers import JsonLexer, XmlLexer, HttpLexer, TextLexer, HtmlLexer
 from pygments.formatters import HtmlFormatter
 
 class ResponsePanel(QWidget):
@@ -95,11 +95,20 @@ class ResponsePanel(QWidget):
         else:
             self.size_label.setText(f"Size: {size} B")
 
+        # Auto-detect and auto-prettify JSON
+        headers = response_data.get("headers", {})
+        content_type = headers.get("Content-Type", "").lower()
+        if "application/json" in content_type:
+            try:
+                parsed = json.loads(response_data.get("text", ""))
+                self.last_response["text"] = json.dumps(parsed, indent=2)
+            except:
+                pass
+
         self.refresh_view()
 
         # Update Headers
         self.headers_table.setRowCount(0)
-        headers = response_data.get("headers", {})
         for key, value in headers.items():
             row = self.headers_table.rowCount()
             self.headers_table.insertRow(row)
@@ -118,11 +127,8 @@ class ResponsePanel(QWidget):
             lexer = TextLexer()
             if "application/json" in content_type:
                 lexer = JsonLexer()
-                try:
-                    parsed = json.loads(text)
-                    text = json.dumps(parsed, indent=2)
-                except:
-                    pass
+            elif "text/html" in content_type:
+                lexer = HtmlLexer()
             elif "application/xml" in content_type or "text/xml" in content_type:
                 lexer = XmlLexer()
             

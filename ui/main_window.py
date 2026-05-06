@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (QMainWindow, QSplitter, QWidget, QVBoxLayout, 
-                             QPushButton, QHBoxLayout, QTabWidget, QInputDialog)
+                             QPushButton, QHBoxLayout, QTabWidget, QInputDialog, QMessageBox, QToolButton)
 from PySide6.QtCore import Qt
 from ui.collection_tree import CollectionTreeWidget
 from ui.history_panel import HistoryPanel
@@ -19,6 +19,8 @@ class RequestTab(QWidget):
         layout = QVBoxLayout(self)
         
         self.splitter = QSplitter(Qt.Vertical)
+        self.splitter.setStyleSheet("QSplitter::handle { background-color: #555; height: 3px; } QSplitter::handle:hover { background-color: #888; }")
+        
         self.request_panel = RequestPanel()
         self.response_panel = ResponsePanel()
         
@@ -44,19 +46,24 @@ class MainWindow(QMainWindow):
         
         # Top bar
         top_bar = QHBoxLayout()
-        self.new_tab_btn = QPushButton("+ New Tab")
-        self.new_tab_btn.clicked.connect(self.add_new_tab)
-        top_bar.addWidget(self.new_tab_btn)
         top_bar.addStretch()
+        
+        self.import_curl_btn = QPushButton("Import cURL")
+        self.import_curl_btn.clicked.connect(self.import_curl)
+        top_bar.addWidget(self.import_curl_btn)
+        
         self.logs_btn = QPushButton("System Logs")
         self.logs_btn.clicked.connect(self.show_logs)
         top_bar.addWidget(self.logs_btn)
         main_layout.addLayout(top_bar)
         
         self.main_splitter = QSplitter(Qt.Horizontal)
+        self.main_splitter.setStyleSheet("QSplitter::handle { background-color: #555; width: 3px; } QSplitter::handle:hover { background-color: #888; }")
         
         # Sidebar
         self.sidebar_splitter = QSplitter(Qt.Vertical)
+        self.sidebar_splitter.setStyleSheet("QSplitter::handle { background-color: #555; height: 3px; } QSplitter::handle:hover { background-color: #888; }")
+        
         self.collection_tree = CollectionTreeWidget()
         self.history_panel = HistoryPanel()
         self.sidebar_splitter.addWidget(self.collection_tree)
@@ -66,6 +73,12 @@ class MainWindow(QMainWindow):
         self.request_tabs = QTabWidget()
         self.request_tabs.setTabsClosable(True)
         self.request_tabs.tabCloseRequested.connect(self.close_tab)
+        self.request_tabs.tabBar().tabBarDoubleClicked.connect(self.rename_tab)
+        
+        self.new_tab_btn = QToolButton()
+        self.new_tab_btn.setText("+")
+        self.new_tab_btn.clicked.connect(self.add_new_tab)
+        self.request_tabs.setCornerWidget(self.new_tab_btn, Qt.TopRightCorner)
         
         self.main_splitter.addWidget(self.sidebar_splitter)
         self.main_splitter.addWidget(self.request_tabs)
@@ -81,6 +94,61 @@ class MainWindow(QMainWindow):
         self.history_panel.request_selected.connect(self.load_request)
         
         logger.info("Getman UI Initialized with Tab Support")
+
+    def closeEvent(self, event):
+        self.log_viewer.close()
+        super().closeEvent(event)
+
+    def import_curl(self):
+        curl_text, ok = QInputDialog.getMultiLineText(self, "Import cURL", "Paste cURL command here:")
+        if ok and curl_text:
+            try:
+                import shlex
+                parts = shlex.split(curl_text)
+                if not parts or parts[0] != "curl":
+                    raise ValueError("Not a valid cURL command")
+                
+                url = ""
+                method = "GET"
+                headers = {}
+                data = ""
+                
+                i = 1
+                while i < len(parts):
+                    p = parts[i]
+                    if p in ("-X", "--request") and i + 1 < len(parts):
+                        method = parts[i+1].upper()
+                        i += 1
+                    elif p in ("-H", "--header") and i + 1 < len(parts):
+                        h = parts[i+1]
+                        if ":" in h:
+                            k, v = h.split(":", 1)
+                            headers[k.strip()] = v.strip()
+                        i += 1
+                    elif p in ("-d", "--data", "--data-raw") and i + 1 < len(parts):
+                        data = parts[i+1]
+                        if method == "GET": method = "POST"
+                        i += 1
+                    elif not p.startswith("-"):
+                        url = p
+                    i += 1
+                
+                if not url:
+                    raise ValueError("No URL found in cURL command")
+                    
+                req_data = {"method": method, "url": url, "headers": headers, "body": {"mode": "raw", "raw": data} if data else ""}
+                self.load_request(req_data)
+                logger.info("Imported cURL command")
+            except Exception as e:
+                QMessageBox.warning(self, "Import Error", f"Failed to parse cURL: {str(e)}")
+                logger.error(f"cURL import failed: {str(e)}")
+
+    def rename_tab(self, index):
+        if index >= 0:
+            old_name = self.request_tabs.tabText(index)
+            new_name, ok = QInputDialog.getText(self, "Rename Tab", "Enter new name:", text=old_name)
+            if ok and new_name:
+                self.request_tabs.setTabText(index, new_name)
 
     def add_new_tab(self):
         tab = RequestTab()
@@ -143,7 +211,9 @@ class MainWindow(QMainWindow):
     def on_save_request(self, tab, data):
         collections = get_collections_list()
         if not collections:
-            logger.warning("No collections found to save into")
+            msg = "No collections found to save into. Please create or import one first."
+            logger.warning(msg)
+            QMessageBox.warning(self, "Save Error", msg)
             return
             
         col_name, ok = QInputDialog.getItem(self, "Save to Collection", "Select Collection:", collections, 0, False)
@@ -165,3 +235,12 @@ class MainWindow(QMainWindow):
                     save_collection(col_name, col_data)
                     self.collection_tree.refresh()
                     logger.info(f"Saved request '{req_name}' to {col_name}")
+                    QMessageBox.information(self, "Save Success", f"Request '{req_name}' saved to collection '{col_name}'.")
+                else:
+                    logger.debug("Save cancelled: No request name provided.")
+            else:
+                msg = f"Failed to load collection '{col_name}'."
+                logger.error(msg)
+                QMessageBox.critical(self, "Save Error", msg)
+        else:
+            logger.debug("Save cancelled: No collection selected.")
