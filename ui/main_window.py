@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QMainWindow, QSplitter, QWidget, QVBoxLayout, 
                              QPushButton, QHBoxLayout, QTabWidget, QInputDialog, 
-                             QMessageBox, QToolButton, QLabel, QComboBox)
+                             QMessageBox, QToolButton, QLabel, QComboBox, QDialog)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QShortcut, QKeySequence
 from ui.collection_tree import CollectionTreeWidget
