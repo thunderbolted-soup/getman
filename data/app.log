@@ -1,0 +1,9 @@
+15:20:29 [INFO] Application setup complete
+15:20:29 [INFO] Getman UI Initialized
+15:20:29 [INFO] Starting Getman event loop
+15:20:54 [DEBUG] UI Triggered Send: GET https://google.com
+15:20:54 [INFO] Starting request: GET https://google.com
+15:20:55 [INFO] Response received: 200 (1573ms)
+15:22:11 [INFO] Application setup complete
+15:22:11 [INFO] Getman UI Initialized
+15:22:11 [INFO] Starting Getman event loop
