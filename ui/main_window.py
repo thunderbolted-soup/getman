@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QMainWindow, QSplitter, QWidget, QVBoxLayout, 
                              QPushButton, QHBoxLayout, QTabWidget, QInputDialog, QMessageBox, QToolButton)
-from PySide6.QtCore import Qt, QKeySequence
-from PySide6.QtGui import QAction, QShortcut
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction, QShortcut, QKeySequence
 from ui.collection_tree import CollectionTreeWidget
 from ui.history_panel import HistoryPanel
 from ui.request_panel import RequestPanel
