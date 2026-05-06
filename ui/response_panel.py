@@ -144,10 +144,11 @@ class ResponsePanel(QWidget):
             
             bg_color = "#272822" if self.pretty_btn.isChecked() else "white"
             text_color = "#f8f8f2" if self.pretty_btn.isChecked() else "black"
+            white_space = "pre-wrap" if self.wrap_btn.isChecked() else "pre"
             
             html = f"""
             <html>
-            <body style="background-color: {bg_color}; color: {text_color}; margin: 0; padding: 10px; font-family: 'Courier New';">
+            <body style="background-color: {bg_color}; color: {text_color}; margin: 0; padding: 10px; font-family: 'Courier New'; white-space: {white_space};">
                 {highlighted}
             </body>
             </html>
@@ -164,6 +165,7 @@ class ResponsePanel(QWidget):
             self.body_edit.setLineWrapMode(QTextEdit.WidgetWidth)
         else:
             self.body_edit.setLineWrapMode(QTextEdit.NoWrap)
+        self.refresh_view()
 
     def on_prettify_clicked(self):
         if not self.last_response:
