@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# User data
+data/*.json
+data/collections/*.json
+!data/collections/.gitkeep
