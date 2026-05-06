@@ -156,3 +156,33 @@
 20:55:24 [INFO] Application setup complete
 20:55:25 [INFO] Getman UI Initialized with Hotkeys and Improved UX
 20:55:25 [INFO] Starting Getman event loop
+21:21:22 [INFO] Application setup complete
+21:21:22 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+21:21:22 [INFO] Starting Getman event loop
+21:21:35 [DEBUG] Tab Sending: GET https://httpbin.org/get
+21:21:35 [INFO] Starting request: GET https://httpbin.org/get
+21:21:36 [INFO] Response received: 200 (921ms)
+21:24:14 [INFO] Application setup complete
+21:24:14 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+21:24:14 [INFO] Starting Getman event loop
+21:26:19 [INFO] Application setup complete
+21:26:19 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+21:26:19 [INFO] Starting Getman event loop
+21:26:24 [DEBUG] Tab Sending: GET https://httpbin.org/get
+21:26:24 [INFO] Starting request: GET https://httpbin.org/get
+21:26:25 [INFO] Response received: 200 (1054ms)
+21:32:10 [INFO] Application setup complete
+21:32:11 [INFO] Getman UI Initialized with Hotkeys and Improved UX
+21:32:11 [INFO] Starting Getman event loop
+21:32:13 [DEBUG] Tab Sending: GET https://httpbin.org/get
+21:32:13 [INFO] Starting request: GET https://httpbin.org/get
+21:32:14 [INFO] Response received: 200 (1002ms)
+21:32:28 [DEBUG] Tab Sending: GET https://google.com
+21:32:28 [INFO] Starting request: GET https://google.com
+21:32:30 [INFO] Response received: 200 (1621ms)
+21:34:40 [DEBUG] Tab Sending: GET sdfsdfsdfg
+21:34:40 [INFO] Starting request: GET sdfsdfsdfg
+21:34:40 [ERROR] Request failed: Request URL is missing an 'http://' or 'https://' protocol.
+21:34:53 [DEBUG] Tab Sending: GET https://google.com
+21:34:53 [INFO] Starting request: GET https://google.com
+21:34:55 [INFO] Response received: 200 (2107ms)

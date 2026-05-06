@@ -101,7 +101,12 @@ class ResponsePanel(QWidget):
 
         # Auto-detect and auto-prettify JSON
         headers = response_data.get("headers", {})
-        content_type = headers.get("Content-Type", "").lower()
+        content_type = ""
+        for k, v in headers.items():
+            if k.lower() == "content-type":
+                content_type = v.lower()
+                break
+                
         if "application/json" in content_type:
             try:
                 parsed = json.loads(response_data.get("text", ""))
@@ -125,7 +130,11 @@ class ResponsePanel(QWidget):
             
         text = self.last_response.get("text", "")
         headers = self.last_response.get("headers", {})
-        content_type = headers.get("Content-Type", "").lower()
+        content_type = ""
+        for k, v in headers.items():
+            if k.lower() == "content-type":
+                content_type = v.lower()
+                break
         
         if self.pretty_btn.isChecked():
             lexer = TextLexer()
@@ -136,20 +145,18 @@ class ResponsePanel(QWidget):
             elif "application/xml" in content_type or "text/xml" in content_type:
                 lexer = XmlLexer()
             
-            # Fix highlighting: wrap in a div and ensure CSS is properly applied
-            formatter = HtmlFormatter(nowrap=False, style='monokai', noclasses=True)
+            # Use nowrap=True to get just the inline styled span tags
+            formatter = HtmlFormatter(nowrap=True, style='monokai', noclasses=True)
             highlighted = highlight(text, lexer, formatter)
-            # Use monokai style for dark background look or stick to inline styles (noclasses=True)
-            # When noclasses=True, HtmlFormatter injects styles directly into elements.
             
-            bg_color = "#272822" if self.pretty_btn.isChecked() else "white"
-            text_color = "#f8f8f2" if self.pretty_btn.isChecked() else "black"
+            bg_color = "#272822"
+            text_color = "#f8f8f2"
             white_space = "pre-wrap" if self.wrap_btn.isChecked() else "pre"
             
             html = f"""
             <html>
-            <body style="background-color: {bg_color}; color: {text_color}; margin: 0; padding: 10px; font-family: 'Courier New'; white-space: {white_space};">
-                {highlighted}
+            <body style="background-color: {bg_color}; color: {text_color}; margin: 0; padding: 10px; font-family: 'Courier New';">
+                <pre style="white-space: {white_space}; margin: 0;">{highlighted}</pre>
             </body>
             </html>
             """
