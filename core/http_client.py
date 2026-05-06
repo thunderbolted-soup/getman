@@ -47,8 +47,12 @@ class HttpClientThread(QThread):
     async def _execute_request(self) -> dict:
         start_time = time.perf_counter()
         
-        # Use httpx.AsyncClient for the request
-        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+        # Use httpx.AsyncClient with a default User-Agent
+        async with httpx.AsyncClient(
+            timeout=60.0, 
+            follow_redirects=True,
+            headers={"User-Agent": "Postman/7.0.0"}
+        ) as client:
             response = await client.request(
                 method=self.method,
                 url=self.url,
