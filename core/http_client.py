@@ -2,6 +2,9 @@ import asyncio
 import time
 import httpx
 from PySide6.QtCore import QThread, Signal, QObject
+from core.logger import get_logger
+
+logger = get_logger()
 
 class HttpClientThread(QThread):
     """
@@ -21,10 +24,12 @@ class HttpClientThread(QThread):
 
     def run(self):
         try:
+            logger.info(f"Starting request: {self.method} {self.url}")
             # Execute the async request in a new event loop for this thread
             result = asyncio.run(self._execute_request())
             self.finished.emit(result)
         except Exception as e:
+            logger.error(f"Request failed: {str(e)}")
             self.error.emit(str(e))
 
     async def _execute_request(self) -> dict:
@@ -42,6 +47,8 @@ class HttpClientThread(QThread):
             
             end_time = time.perf_counter()
             elapsed_ms = int((end_time - start_time) * 1000)
+            
+            logger.info(f"Response received: {response.status_code} ({elapsed_ms}ms)")
             
             return {
                 "status_code": response.status_code,

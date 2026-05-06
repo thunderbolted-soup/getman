@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QTreeWidget, 
                              QTreeWidgetItem, QMenu, QFileDialog, QPushButton, QHBoxLayout)
 from PySide6.QtCore import Signal, Qt
-from core.collection import get_collections_list, load_collection, import_postman_collection, delete_collection
+from core.collection import get_collections_list, load_collection, import_external_collection, delete_collection
 
 class CollectionTreeWidget(QWidget):
     request_selected = Signal(dict)
@@ -65,9 +65,9 @@ class CollectionTreeWidget(QWidget):
             self.request_selected.emit(data["data"])
 
     def on_import_clicked(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Import Postman Collection", "", "JSON Files (*.json)")
+        file_path, _ = QFileDialog.getOpenFileName(self, "Import Collection", "", "JSON Files (*.json)")
         if file_path:
-            import_postman_collection(file_path)
+            import_external_collection(file_path)
             self.refresh()
 
     def on_context_menu(self, pos):

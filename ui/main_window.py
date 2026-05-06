@@ -1,22 +1,36 @@
-from PySide6.QtWidgets import QMainWindow, QSplitter, QWidget, QVBoxLayout
+from PySide6.QtWidgets import QMainWindow, QSplitter, QWidget, QVBoxLayout, QPushButton, QHBoxLayout
 from PySide6.QtCore import Qt
 from ui.collection_tree import CollectionTreeWidget
 from ui.history_panel import HistoryPanel
 from ui.request_panel import RequestPanel
 from ui.response_panel import ResponsePanel
+from ui.log_viewer import LogViewer
 from core.http_client import HttpClientThread
 from storage.history import add_to_history
+from core.logger import get_logger
+
+logger = get_logger()
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Getman - Postman Clone")
+        self.setWindowTitle("Getman")
         self.resize(1200, 800)
+        
+        self.log_viewer = LogViewer()
         
         # Central widget and main layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
+        
+        # Top bar for global actions
+        top_bar = QHBoxLayout()
+        top_bar.addStretch()
+        self.logs_btn = QPushButton("System Logs")
+        self.logs_btn.clicked.connect(self.show_logs)
+        top_bar.addWidget(self.logs_btn)
+        main_layout.addLayout(top_bar)
         
         # Main Splitter (Left Sidebar | Right Content)
         self.main_splitter = QSplitter(Qt.Horizontal)
@@ -49,8 +63,15 @@ class MainWindow(QMainWindow):
         self.request_panel.send_requested.connect(self.on_send_request)
         self.collection_tree.request_selected.connect(self.request_panel.set_request_data)
         self.history_panel.request_selected.connect(self.request_panel.set_request_data)
+        
+        logger.info("Getman UI Initialized")
+
+    def show_logs(self):
+        self.log_viewer.show()
+        self.log_viewer.raise_()
 
     def on_send_request(self, method, url, headers, body, params):
+        logger.debug(f"UI Triggered Send: {method} {url}")
         self.response_panel.status_label.setText("Sending...")
         self.request_thread = HttpClientThread(method, url, headers, body, params)
         self.request_thread.finished.connect(self.on_request_finished)
