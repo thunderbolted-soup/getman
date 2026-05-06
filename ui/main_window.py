@@ -47,6 +47,8 @@ class MainWindow(QMainWindow):
 
         # Connections
         self.request_panel.send_requested.connect(self.on_send_request)
+        self.collection_tree.request_selected.connect(self.request_panel.set_request_data)
+        self.history_panel.request_selected.connect(self.request_panel.set_request_data)
 
     def on_send_request(self, method, url, headers, body, params):
         self.response_panel.status_label.setText("Sending...")
@@ -66,12 +68,13 @@ class MainWindow(QMainWindow):
             "method": self.request_thread.method,
             "url": self.request_thread.url,
             "headers": self.request_thread.headers,
+            "params": self.request_thread.params,
             "body": self.request_thread.body,
             "response_status": result["status_code"],
             "response_time_ms": result["elapsed_ms"]
         }
         add_to_history(history_entry)
-        # Update history UI (will be implemented in Phase 4)
+        self.history_panel.refresh()
 
     def on_request_error(self, error_msg):
         self.request_panel.send_btn.setEnabled(True)

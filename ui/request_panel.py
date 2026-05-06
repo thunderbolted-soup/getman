@@ -116,3 +116,46 @@ class RequestPanel(QWidget):
         body = self.body_edit.toPlainText()
         
         self.send_requested.emit(method, url, headers, body, params)
+
+    def set_request_data(self, data: dict):
+        """Loads request data into the UI. Handles both Postman and internal history formats."""
+        # Method
+        method = data.get("method", "GET")
+        index = self.method_combo.findText(method)
+        if index >= 0:
+            self.method_combo.setCurrentIndex(index)
+            
+        # URL
+        url = data.get("url", "")
+        if isinstance(url, dict):
+            url = url.get("raw", "")
+        self.url_edit.setText(url)
+        
+        # Headers
+        headers = data.get("headers", {})
+        if not headers:
+            # Try Postman format
+            headers_list = data.get("header", [])
+            if isinstance(headers_list, list):
+                headers = {h.get("key"): h.get("value") for h in headers_list if h.get("key")}
+        self.headers_table.set_data(headers)
+        
+        # Params (Try to extract from URL if not present?)
+        # For now, history stores them separately. Postman stores them in url.query.
+        params = data.get("params", {})
+        if not params and isinstance(data.get("url"), dict):
+            query_list = data["url"].get("query", [])
+            if isinstance(query_list, list):
+                params = {q.get("key"): q.get("value") for q in query_list if q.get("key")}
+        self.params_table.set_data(params)
+        
+        # Body
+        body = data.get("body", "")
+        if isinstance(body, dict):
+            # Postman body format
+            mode = body.get("mode")
+            if mode == "raw":
+                body = body.get("raw", "")
+            else:
+                body = "" # Other modes not fully implemented
+        self.body_edit.setPlainText(str(body))
