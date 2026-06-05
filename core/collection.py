@@ -1,6 +1,6 @@
 import os
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from storage.store import load_json, save_json
 
 from core.logger import get_logger
@@ -59,6 +59,66 @@ def import_external_collection(source_path: str) -> Optional[str]:
     save_collection(filename, data)
     logger.info(f"Collection imported and saved as: {filename}")
     return filename
+
+def save_openapi_collection(collection: dict, env_vars: dict = None,
+                             auth_profiles: list = None,
+                             collection_name: str = "",
+                             create_env: bool = True,
+                             import_auth: bool = True) -> Tuple[Optional[str], Optional[dict], int]:
+    """Saves a converted OpenAPI collection with optional environment and auth profiles.
+
+    Returns:
+        Tuple of (collection_filename, environment_dict, endpoint_count)
+    """
+    if not collection:
+        logger.error("No collection data provided")
+        return None, None, 0
+
+    if collection_name:
+        collection["info"]["name"] = collection_name
+
+    safe_name = "".join([c for c in collection["info"]["name"] if c.isalnum() or c in (' ', '_', '-')]).strip()
+    if not safe_name:
+        safe_name = "imported_openapi"
+
+    filename = f"{safe_name}.json"
+    counter = 1
+    while os.path.exists(os.path.join(COLLECTIONS_DIR, filename)):
+        filename = f"{safe_name}_{counter}.json"
+        counter += 1
+
+    endpoint_count = sum(len(f.get("item", [])) for f in collection.get("item", []))
+
+    save_collection(filename, collection)
+    logger.info(f"OpenAPI collection saved as: {filename} ({endpoint_count} endpoints)")
+
+    result_env = None
+    env_vars = env_vars or {}
+    if create_env and env_vars:
+        from core.environment import save_environments, get_all_environments
+        env_name = f"{collection['info']['name']} Environment"
+        new_env = {
+            "name": env_name,
+            "values": [{"key": k, "value": str(v), "enabled": True} for k, v in env_vars.items()],
+        }
+        envs = get_all_environments() or []
+        envs.append(new_env)
+        save_environments(envs)
+        result_env = new_env
+        logger.info(f"Created environment '{env_name}' with {len(env_vars)} variables")
+
+    auth_profiles = auth_profiles or []
+    if import_auth and auth_profiles:
+        from core.auth import save_auth_entry
+        for profile in auth_profiles:
+            save_auth_entry(
+                name=profile["name"],
+                auth_type=profile["type"],
+                auth_data=profile["data"],
+            )
+        logger.info(f"Imported {len(auth_profiles)} auth profiles")
+
+    return filename, result_env, endpoint_count
 
 def delete_collection(filename: str):
     """Deletes a collection file."""

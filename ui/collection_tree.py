@@ -16,10 +16,13 @@ class CollectionTreeWidget(QWidget):
         header_layout.addStretch()
         self.new_btn = QPushButton("New")
         self.new_btn.clicked.connect(self.on_new_collection_clicked)
-        self.import_btn = QPushButton("Import")
+        self.import_btn = QPushButton("Import Postman")
         self.import_btn.clicked.connect(self.on_import_clicked)
+        self.import_openapi_btn = QPushButton("Import OpenAPI")
+        self.import_openapi_btn.clicked.connect(self.on_import_openapi_clicked)
         header_layout.addWidget(self.new_btn)
         header_layout.addWidget(self.import_btn)
+        header_layout.addWidget(self.import_openapi_btn)
         layout.addLayout(header_layout)
         
         self.tree = QTreeWidget()
@@ -147,6 +150,12 @@ class CollectionTreeWidget(QWidget):
         file_path, _ = QFileDialog.getOpenFileName(self, "Import Collection", "", "JSON Files (*.json)")
         if file_path:
             import_external_collection(file_path)
+            self.refresh()
+
+    def on_import_openapi_clicked(self):
+        from ui.openapi_import_dialog import OpenApiImportDialog
+        dialog = OpenApiImportDialog(self)
+        if dialog.exec():
             self.refresh()
 
     def on_new_collection_clicked(self):
