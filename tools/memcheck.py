@@ -56,10 +56,10 @@ def _windows_commit() -> float:
 
     counters = Counters()
     counters.cb = ctypes.sizeof(counters)
-    kernel32 = ctypes.WinDLL("kernel32")
+    kernel32, psapi = ctypes.WinDLL("kernel32"), ctypes.WinDLL("psapi")
     kernel32.GetCurrentProcess.restype = wintypes.HANDLE
-    ctypes.WinDLL("psapi").GetProcessMemoryInfo(kernel32.GetCurrentProcess(), ctypes.byref(counters),
-                                                counters.cb)
+    psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD]
+    psapi.GetProcessMemoryInfo(kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb)
     return counters.PrivateUsage / 1024 / 1024
 
 
