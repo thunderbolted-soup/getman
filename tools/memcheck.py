@@ -4,9 +4,11 @@ reports the process memory the OS charges to it.
     python tools/memcheck.py              # print numbers
     python tools/memcheck.py --budget 50  # exit 1 if over 50 MB
 
-Metric: Windows — private working set (the "Memory" column of Task Manager,
-needs ``pip install psutil``); Linux — anonymous private memory (shared
-library code is excluded, as on Windows); macOS — RSS (upper bound).
+Metric: Windows — private working set, exactly what the "Memory" column of
+Task Manager shows (non-shareable resident pages; DLL code is excluded), read
+with QueryWorkingSet; commit charge is printed for reference. Linux —
+anonymous private memory (the same idea: shared library code is excluded).
+macOS — RSS via psutil (upper bound).
 """
 import argparse
 import gc
@@ -22,18 +24,62 @@ sys.path.insert(0, ROOT)
 os.environ.setdefault("GETMAN_DATA_DIR", tempfile.mkdtemp(prefix="getman-mem-"))
 
 
+def _windows_private_ws() -> float:
+    """Private working set: resident pages whose "Shared" bit is clear."""
+    import ctypes
+    from ctypes import wintypes
+    psapi, kernel32 = ctypes.WinDLL("psapi"), ctypes.WinDLL("kernel32")
+    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    psapi.QueryWorkingSet.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD]
+    handle = kernel32.GetCurrentProcess()
+    count = 1 << 16
+    while True:
+        buf = (ctypes.c_size_t * (count + 1))()
+        if psapi.QueryWorkingSet(handle, buf, ctypes.sizeof(buf)):
+            break
+        count = max(count * 2, buf[0] + 4096)  # ERROR_BAD_LENGTH: buf[0] holds the entry count
+    entries = buf[0]
+    private = sum(1 for i in range(1, entries + 1) if not (buf[i] >> 8) & 1)
+    return private * 4096 / 1024 / 1024
+
+
+def _windows_commit() -> float:
+    import ctypes
+    from ctypes import wintypes
+
+    class Counters(ctypes.Structure):
+        _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD)] + [
+            (name, ctypes.c_size_t) for name in (
+                "PeakWorkingSetSize", "WorkingSetSize", "QuotaPeakPagedPoolUsage", "QuotaPagedPoolUsage",
+                "QuotaPeakNonPagedPoolUsage", "QuotaNonPagedPoolUsage", "PagefileUsage", "PeakPagefileUsage",
+                "PrivateUsage")]
+
+    counters = Counters()
+    counters.cb = ctypes.sizeof(counters)
+    kernel32 = ctypes.WinDLL("kernel32")
+    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    ctypes.WinDLL("psapi").GetProcessMemoryInfo(kernel32.GetCurrentProcess(), ctypes.byref(counters),
+                                                counters.cb)
+    return counters.PrivateUsage / 1024 / 1024
+
+
 def private_mb() -> float:
     if sys.platform.startswith("linux"):
         with open("/proc/self/smaps_rollup") as f:
             for line in f:
                 if line.startswith("Anonymous:"):
                     return int(line.split()[1]) / 1024
+    if sys.platform == "win32":
+        return _windows_private_ws()
     try:
         import psutil
     except ImportError:
         sys.exit("psutil is required on this platform: pip install psutil")
-    info = psutil.Process().memory_full_info()
-    return (info.uss if sys.platform == "win32" else info.rss) / 1024 / 1024
+    return psutil.Process().memory_info().rss / 1024 / 1024
+
+
+def extra() -> str:
+    return f"  (commit charge {_windows_commit():.1f} MB)" if sys.platform == "win32" else ""
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):
@@ -72,7 +118,7 @@ def main() -> int:
     wait(1500)
     gc.collect()
     idle = private_mb()
-    print(f"idle after start:            {idle:6.1f} MB")
+    print(f"idle after start:            {idle:6.1f} MB{extra()}")
 
     for _ in range(4):
         window.new_tab()
@@ -87,7 +133,7 @@ def main() -> int:
     wait(1000)
     gc.collect()
     busy = private_mb()
-    print(f"5 tabs, 40 requests sent:    {busy:6.1f} MB")
+    print(f"5 tabs, 40 requests sent:    {busy:6.1f} MB{extra()}")
     window.close()
     app.quit()
     server.shutdown()

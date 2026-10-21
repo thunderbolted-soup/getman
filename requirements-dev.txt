@@ -1,3 +1,3 @@
 -r requirements.txt
 pytest>=8
-psutil>=5.9  # tools/memcheck.py on Windows/macOS
+psutil>=5.9  # tools/memcheck.py on macOS (Windows/Linux read the OS counters directly)
