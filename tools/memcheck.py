@@ -154,12 +154,19 @@ def _probe(window, split, wait):
     mono.setFont(font)
     split.addWidget(mono)
     step("label, monospace font")
-    symbols = QLabel("☰ ⚙ ⋯ ⌕ ⧉ ⤓ ↩ ✕ ＋ ● ⟳ ▾ ✔ ✘")
+    from ui.icons import icon
+    from PySide6.QtWidgets import QToolButton
+    for name in ("menu", "search", "eye", "gear", "more", "close", "plus", "wrap", "copy", "download"):
+        button = QToolButton()
+        button.setIcon(icon(name))
+        split.addWidget(button)
+    step("painted icons")
+    kept = QLabel("× … · — ●  (the only non-ASCII glyphs the UI uses)")
+    split.addWidget(kept)
+    step("label, glyphs kept in the UI")
+    symbols = QLabel("☰ ⚙ ⋯ ⌕ ✕ ＋ ⟳")
     split.addWidget(symbols)
-    step("label, symbol glyphs")
-    emoji = QLabel("👁 📁 🌐")
-    split.addWidget(emoji)
-    step("label, emoji glyphs")
+    step("label, symbol glyphs (avoided)")
 
 
 def main() -> int:

@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (QComboBox, QFormLayout, QHBoxLayout, QLabel, QLin
 
 from core.models import new_auth
 from ui.fields import SmartLineEdit
+from ui.icons import set_icon
 
 TYPES = [("inherit", "Inherit from parent"), ("none", "No auth"), ("bearer", "Bearer token"),
          ("basic", "Basic auth"), ("apikey", "API key")]
@@ -89,7 +90,7 @@ class AuthEditor(QWidget):
                     rl.setContentsMargins(0, 0, 0, 0)
                     rl.addWidget(edit)
                     eye = QToolButton()
-                    eye.setText("👁")
+                    set_icon(eye, "eye")
                     eye.setCheckable(True)
                     eye.setToolTip("Show password")
                     eye.toggled.connect(lambda on, e=edit: e.setEchoMode(

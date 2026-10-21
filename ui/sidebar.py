@@ -523,7 +523,7 @@ class Sidebar(QWidget):
         bottom = QHBoxLayout()
         bottom.setSpacing(6)
         new_btn = QToolButton()
-        new_btn.setText("＋  New")
+        new_btn.setText("+  New")
         new_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
         new_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         new_menu = QMenu(new_btn)

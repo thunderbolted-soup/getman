@@ -103,7 +103,7 @@ class CommandPalette(QDialog):
         self.entries.append({"kind": "env", "tag": "ENV", "title": "Switch to: No environment", "detail": "",
                              "run": lambda: switch_env(None)})
         for title, shortcut, fn in actions:
-            self.entries.append({"kind": "action", "tag": "⌘", "title": title, "detail": shortcut, "run": fn})
+            self.entries.append({"kind": "action", "tag": "CMD", "title": title, "detail": shortcut, "run": fn})
         for e in self.entries:
             e["hay"] = f"{e['title']} {e['detail']} {e['tag']}".lower()
         self._filter("")

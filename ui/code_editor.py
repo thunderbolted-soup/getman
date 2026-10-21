@@ -495,9 +495,10 @@ class FindBar(QWidget):
         self.count = QLabel("")
         self.count.setObjectName("Dim")
         prev_btn, next_btn, close_btn = QToolButton(), QToolButton(), QToolButton()
-        prev_btn.setText("↑")
-        next_btn.setText("↓")
-        close_btn.setText("✕")
+        from ui.icons import set_icon
+        set_icon(prev_btn, "up")
+        set_icon(next_btn, "down")
+        set_icon(close_btn, "close")
         prev_btn.setToolTip("Previous (Shift+Enter)")
         next_btn.setToolTip("Next (Enter)")
         lay.addWidget(self.edit, 1)

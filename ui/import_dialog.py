@@ -210,7 +210,7 @@ class ImportDialog(QDialog):
     # --- preview tree ------------------------------------------------------------------
     def _show(self, res: importers.ImportResult, source: str):
         self.result_data = res
-        warnings = "".join(f"<br>⚠ {w}" for w in res.warnings)
+        warnings = "".join(f"<br>Warning: {w}" for w in res.warnings)
         self.summary.setText(f"<b>{res.kind}</b> from {source}: {res.summary()}{warnings}")
         self.tree.blockSignals(True)
         self.tree.clear()
@@ -239,7 +239,7 @@ class ImportDialog(QDialog):
     def _add_items(self, parent: QTreeWidgetItem, items):
         for it in items:
             if it.get("type") == "folder":
-                node = QTreeWidgetItem(parent, [f"📁 {it['name']}"])
+                node = QTreeWidgetItem(parent, [f"{it['name']} /"])
                 node.setFlags(node.flags() | Qt.ItemFlag.ItemIsAutoTristate | Qt.ItemFlag.ItemIsUserCheckable)
                 node.setCheckState(0, Qt.CheckState.Checked)
                 node.setData(0, KIND, ("folder", it["id"]))

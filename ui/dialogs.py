@@ -155,7 +155,7 @@ class EnvironmentDialog(QDialog):
     def _fill(self, select: Optional[str] = None):
         self.list.blockSignals(True)
         self.list.clear()
-        g = QListWidgetItem("🌐  Globals")
+        g = QListWidgetItem("Globals")
         g.setData(Qt.ItemDataRole.UserRole, self.GLOBALS)
         self.list.addItem(g)
         for env in self.ctx.envs.environments:
@@ -453,7 +453,7 @@ class SaveRequestDialog(QDialog):
         self.tree.setHeaderHidden(True)
         self.tree.setIndentation(14)
         lay.addWidget(self.tree, 1)
-        new_col = QPushButton("＋ New collection")
+        new_col = QPushButton("+ New collection")
         new_col.clicked.connect(self._new_collection)
         row = QHBoxLayout()
         row.addWidget(new_col)
@@ -469,7 +469,7 @@ class SaveRequestDialog(QDialog):
         def add(parent_item, col_id, items):
             for it in items:
                 if it.get("type") == "folder":
-                    node = QTreeWidgetItem(parent_item, ["📁 " + it["name"]])
+                    node = QTreeWidgetItem(parent_item, [it["name"] + " /"])
                     node.setData(0, Qt.ItemDataRole.UserRole, (col_id, it["id"]))
                     add(node, col_id, it["items"])
 
@@ -528,7 +528,7 @@ class ShortcutsDialog(QDialog):
             grid.addWidget(k, i, 0)
             grid.addWidget(d, i, 1)
         lay.addLayout(grid)
-        note = QLabel("On macOS use ⌘ instead of Ctrl.")
+        note = QLabel("On macOS use Cmd instead of Ctrl.")
         note.setObjectName("Faint")
         lay.addWidget(note)
         box = plain_buttons(QDialogButtonBox(QDialogButtonBox.StandardButton.Close))

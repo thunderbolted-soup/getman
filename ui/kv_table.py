@@ -60,7 +60,7 @@ class _CellDelegate(QStyledItemDelegate):
             if option.state & QStyle.StateFlag.State_MouseOver and index.row() < self.owner.table.rowCount() - 1:
                 painter.save()
                 painter.setPen(QColor(theme.color("text_dim")))
-                painter.drawText(option.rect, Qt.AlignmentFlag.AlignCenter, "✕")
+                painter.drawText(option.rect, Qt.AlignmentFlag.AlignCenter, "×")
                 painter.restore()
             return
         text = index.data(Qt.ItemDataRole.DisplayRole) or ""

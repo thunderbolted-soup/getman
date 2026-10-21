@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QFileDialog, QHBoxLayout, QHea
 from core.http_client import ResponseData
 from ui import theme
 from ui.code_editor import CodeEditor, FindBar
+from ui.icons import set_icon
 from ui.request_editor import Segmented
 
 PRETTY_LIMIT = 5 * 1024 * 1024
@@ -111,7 +112,7 @@ def parse_cookies(resp: ResponseData) -> List[dict]:
 def format_console(prep, resp: Optional[ResponseData] = None, error: str = None, post_script=None) -> str:
     lines = []
     if prep is not None:
-        lines.append(f"▶ {prep.method} {prep.url}")
+        lines.append(f"> {prep.method} {prep.url}")
         for k, v in prep.headers:
             lines.append(f"  {k}: {v}")
         if prep.multipart is not None:
@@ -127,12 +128,12 @@ def format_console(prep, resp: Optional[ResponseData] = None, error: str = None,
             if len(prep.body) > 4000:
                 lines.append(f"  … ({human_size(len(prep.body))} total)")
         for w in prep.warnings:
-            lines.append(f"⚠ {w}")
+            lines.append(f"! {w}")
         if prep.script is not None:
             lines.extend(_script_lines("pre-request", prep.script))
     if resp is not None:
         lines.append("")
-        lines.append(f"◀ {resp.http_version} {resp.status} {resp.reason}   ·  {resp.elapsed_ms} ms "
+        lines.append(f"< {resp.http_version} {resp.status} {resp.reason}   ·  {resp.elapsed_ms} ms "
                      f"(first byte {resp.ttfb_ms} ms)  ·  {human_size(resp.size)}")
         if resp.url and prep is not None and resp.url != prep.url:
             lines.append(f"  final URL after redirects: {resp.url}")
@@ -140,7 +141,7 @@ def format_console(prep, resp: Optional[ResponseData] = None, error: str = None,
             lines.append(f"  {k}: {v}")
     if error:
         lines.append("")
-        lines.append(f"✖ {error}")
+        lines.append(f"x {error}")
     if post_script is not None:
         lines.extend(_script_lines("post-response", post_script))
     return "\n".join(lines)
@@ -153,12 +154,12 @@ def _script_lines(label: str, result) -> List[str]:
         out.append(f"— {label} script —")
     out.extend(f"  {line}" for line in result.logs)
     for name, passed, msg in result.tests:
-        out.append(f"  {'✔' if passed else '✘'} {name}" + (f" — {msg}" if msg else ""))
+        out.append(f"  {'[pass]' if passed else '[FAIL]'} {name}" + (f" — {msg}" if msg else ""))
     for k, v in result.env_changes.items():
         shown = v if len(v) < 80 else v[:77] + "…"
         out.append(f"  env[{k!r}] = {shown!r}")
     if result.error:
-        out.append(f"  ✖ {result.error}")
+        out.append(f"  x {result.error}")
     return out
 
 
@@ -275,10 +276,11 @@ class ResponseView(QWidget):
         self.view_mode.set_value("pretty")
         self.view_mode.changed.connect(self._on_view_mode)
         hl.addWidget(self.view_mode)
-        wrap = self._tool("↩", "Wrap lines", checkable=True)
+        wrap = self._tool("wrap", "Wrap lines", checkable=True)
         wrap.toggled.connect(self._on_wrap)
-        for button, slot in ((wrap, None), (self._tool("⌕", "Find (Ctrl+F)"), self.open_find),
-                             (self._tool("⧉", "Copy body"), self._copy), (self._tool("⤓", "Save body to file"), self._save)):
+        for button, slot in ((wrap, None), (self._tool("search", "Find (Ctrl+F)"), self.open_find),
+                             (self._tool("copy", "Copy body"), self._copy),
+                             (self._tool("download", "Save body to file"), self._save)):
             if slot:
                 button.clicked.connect(slot)
             hl.addWidget(button)
@@ -308,9 +310,9 @@ class ResponseView(QWidget):
         return page
 
     @staticmethod
-    def _tool(text: str, tip: str, checkable: bool = False) -> QToolButton:
+    def _tool(icon_name: str, tip: str, checkable: bool = False) -> QToolButton:
         b = QToolButton()
-        b.setText(text)
+        set_icon(b, icon_name)
         b.setToolTip(tip)
         b.setCheckable(checkable)
         b.setCursor(Qt.CursorShape.PointingHandCursor)

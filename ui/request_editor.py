@@ -18,6 +18,7 @@ from ui import theme
 from ui.auth_editor import AuthEditor
 from ui.code_editor import CodeEditor
 from ui.fields import SmartLineEdit
+from ui.icons import set_icon
 from ui.kv_table import KeyValueTable
 
 BODY_MODES = [("none", "None"), ("json", "JSON"), ("xml", "XML"), ("text", "Text"), ("form", "Form Data"),
@@ -215,7 +216,7 @@ class RequestEditor(QWidget):
         self.save_btn.clicked.connect(self.save_clicked)
         bar.addWidget(self.save_btn)
         more = QToolButton()
-        more.setText("⋯")
+        set_icon(more, "more")
         more.setToolTip("More actions")
         more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         menu = QMenu(more)
@@ -362,7 +363,7 @@ class RequestEditor(QWidget):
         top.addWidget(self.script_kind)
         top.addStretch()
         self.snippets_btn = QToolButton()
-        self.snippets_btn.setText("Snippets ▾")
+        self.snippets_btn.setText("Snippets…")
         self.snippets_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.snippets_menu = QMenu(self.snippets_btn)
         self.snippets_btn.setMenu(self.snippets_menu)

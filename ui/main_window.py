@@ -16,7 +16,7 @@ from core.session import load_session, save_session
 from core.urlutil import split_url
 from ui import theme
 from ui.context import AppContext
-from ui.icons import app_icon
+from ui.icons import app_icon, refresh_icons, set_icon
 from ui.request_editor import RequestEditor
 from ui.response_view import ResponseView, format_console
 from ui.sidebar import Sidebar
@@ -149,7 +149,7 @@ class MainWindow(QMainWindow):
         self.tabbar.installEventFilter(self)
         tr.addWidget(self.tabbar, 1)
         plus = QToolButton()
-        plus.setText("＋")
+        set_icon(plus, "plus")
         plus.setToolTip("New tab (Ctrl+T)")
         plus.clicked.connect(lambda: self.new_tab())
         tr.addWidget(plus)
@@ -213,7 +213,7 @@ class MainWindow(QMainWindow):
         lay.setContentsMargins(10, 6, 10, 6)
         lay.setSpacing(8)
         toggle = QToolButton()
-        toggle.setText("☰")
+        set_icon(toggle, "menu")
         toggle.setToolTip("Toggle sidebar (Ctrl+B)")
         toggle.clicked.connect(self.toggle_sidebar)
         lay.addWidget(toggle)
@@ -221,7 +221,8 @@ class MainWindow(QMainWindow):
         brand.setObjectName("Brand")
         lay.addWidget(brand)
         lay.addStretch(1)
-        search = QPushButton("⌕   Search requests, history, actions…        Ctrl+P")
+        search = QPushButton("  Search requests, history, actions…        Ctrl+P")
+        set_icon(search, "search")
         search.setMinimumWidth(380)
         search.setStyleSheet("text-align: left; padding: 6px 12px;")
         search.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -234,17 +235,17 @@ class MainWindow(QMainWindow):
         self.env_combo.activated.connect(self._on_env_selected)
         lay.addWidget(self.env_combo)
         eye = QToolButton()
-        eye.setText("👁")
+        set_icon(eye, "eye")
         eye.setToolTip("Quick look at variables")
         eye.clicked.connect(lambda: self._show_vars_popup(eye))
         lay.addWidget(eye)
         settings = QToolButton()
-        settings.setText("⚙")
+        set_icon(settings, "gear")
         settings.setToolTip("Settings (Ctrl+,)")
         settings.clicked.connect(self.open_settings)
         lay.addWidget(settings)
         more = QToolButton()
-        more.setText("⋯")
+        set_icon(more, "more")
         more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         menu = QMenu(more)
         menu.addAction("Import…\tCtrl+I", lambda: self.import_dialog())
@@ -401,14 +402,14 @@ class MainWindow(QMainWindow):
         if not isinstance(self.tabbar.tabButton(index, QTabBar.ButtonPosition.RightSide), QToolButton):
             close = QToolButton()
             close.setObjectName("TabClose")
-            close.setText("✕")
+            set_icon(close, "close", 12)
             close.setToolTip("Close (Ctrl+W)")
             close.setCursor(Qt.CursorShape.PointingHandCursor)
             close.clicked.connect(lambda _=False, b=close: self._close_by_button(b))
             self.tabbar.setTabButton(index, QTabBar.ButtonPosition.RightSide, close)
         title = doc.title() + ("  ●" if doc.dirty else "")
         if doc.job is not None:
-            title = "⟳ " + title
+            title += " …"
         self.tabbar.setTabText(index, title)
         self.tabbar.setTabToolTip(index, f"{method} {doc.request['url']}" + ("\nUnsaved changes" if doc.dirty else ""))
 
@@ -793,6 +794,7 @@ class MainWindow(QMainWindow):
             theme.apply_theme(QApplication.instance(), s["theme"])
             self.editor.reload_theme()
             self.response.reload_theme()
+            refresh_icons(self)
             self.sidebar.collections.viewport().update()
             self.sidebar.history.refresh()
             for i in range(len(self.docs)):
