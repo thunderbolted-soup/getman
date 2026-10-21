@@ -24,8 +24,8 @@ sys.path.insert(0, ROOT)
 os.environ.setdefault("GETMAN_DATA_DIR", tempfile.mkdtemp(prefix="getman-mem-"))
 
 
-def _windows_private_ws() -> float:
-    """Private working set: resident pages whose "Shared" bit is clear."""
+def _windows_private_pages() -> list:
+    """Addresses of resident pages whose "Shared" bit is clear (private working set)."""
     import ctypes
     from ctypes import wintypes
     psapi, kernel32 = ctypes.WinDLL("psapi"), ctypes.WinDLL("kernel32")
@@ -38,9 +38,48 @@ def _windows_private_ws() -> float:
         if psapi.QueryWorkingSet(handle, buf, ctypes.sizeof(buf)):
             break
         count = max(count * 2, buf[0] + 4096)  # ERROR_BAD_LENGTH: buf[0] holds the entry count
-    entries = buf[0]
-    private = sum(1 for i in range(1, entries + 1) if not (buf[i] >> 8) & 1)
-    return private * 4096 / 1024 / 1024
+    return [buf[i] >> 12 << 12 for i in range(1, buf[0] + 1) if not (buf[i] >> 8) & 1]
+
+
+def _windows_private_ws() -> float:
+    return len(_windows_private_pages()) * 4096 / 1024 / 1024
+
+
+def windows_breakdown(top: int = 12) -> str:
+    """Who owns the private working set: each DLL's writable/relocated pages
+    vs. heaps and other private allocations."""
+    import collections
+    import ctypes
+    from ctypes import wintypes
+
+    class MBI(ctypes.Structure):
+        _fields_ = [("BaseAddress", ctypes.c_void_p), ("AllocationBase", ctypes.c_void_p),
+                    ("AllocationProtect", wintypes.DWORD), ("PartitionId", wintypes.WORD),
+                    ("RegionSize", ctypes.c_size_t), ("State", wintypes.DWORD), ("Protect", wintypes.DWORD),
+                    ("Type", wintypes.DWORD)]
+
+    kernel32 = ctypes.WinDLL("kernel32")
+    kernel32.VirtualQuery.argtypes = [ctypes.c_void_p, ctypes.POINTER(MBI), ctypes.c_size_t]
+    kernel32.GetModuleFileNameW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, wintypes.DWORD]
+    totals = collections.Counter()
+    names = {}
+    region_end, label = 0, "?"
+    for va in sorted(_windows_private_pages()):
+        if va >= region_end:
+            mbi = MBI()
+            kernel32.VirtualQuery(va, ctypes.byref(mbi), ctypes.sizeof(mbi))
+            region_end = (mbi.BaseAddress or 0) + mbi.RegionSize
+            if mbi.Type == 0x1000000:  # MEM_IMAGE
+                base = mbi.AllocationBase or 0
+                if base not in names:
+                    path = ctypes.create_unicode_buffer(520)
+                    kernel32.GetModuleFileNameW(base, path, 520)
+                    names[base] = "image " + os.path.basename(path.value or hex(base))
+                label = names[base]
+            else:
+                label = {0x40000: "mapped files", 0x20000: "heaps / private allocations"}.get(mbi.Type, "other")
+        totals[label] += 4096
+    return "\n".join(f"    {size / 1048576:6.1f} MB  {name}" for name, size in totals.most_common(top))
 
 
 def _windows_commit() -> float:
@@ -97,21 +136,43 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--budget", type=float, default=0, help="fail when the busy figure exceeds this (MB)")
+    parser.add_argument("--breakdown", action="store_true", help="Windows: show who owns private memory")
+    parser.add_argument("--bare", action="store_true", help="baseline: an empty PySide6 window, no Getman")
     args = parser.parse_args()
+    print(f"python started:              {private_mb():6.1f} MB")
 
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
     from PySide6.QtCore import QEventLoop, QTimer
     from PySide6.QtWidgets import QApplication
+    print(f"Qt modules imported:         {private_mb():6.1f} MB")
     app = QApplication(sys.argv)
-    from ui.main_window import MainWindow
+    print(f"QApplication created:        {private_mb():6.1f} MB")
 
     def wait(ms):
         loop = QEventLoop()
         QTimer.singleShot(ms, loop.quit)
         loop.exec()
 
+    if args.bare:
+        from PySide6.QtWidgets import QMainWindow, QPlainTextEdit, QSplitter, QTreeWidget
+        window = QMainWindow()
+        split = QSplitter()
+        split.addWidget(QTreeWidget())
+        split.addWidget(QPlainTextEdit())
+        window.setCentralWidget(split)
+        window.resize(1360, 860)
+        window.show()
+        wait(1500)
+        gc.collect()
+        print(f"bare PySide6 window shown:   {private_mb():6.1f} MB{extra()}")
+        if args.breakdown and sys.platform == "win32":
+            print(windows_breakdown())
+        return 0
+
+    from ui.main_window import MainWindow
+    print(f"Getman modules imported:     {private_mb():6.1f} MB")
     window = MainWindow()
     window.resize(1360, 860)
     window.show()
@@ -119,6 +180,8 @@ def main() -> int:
     gc.collect()
     idle = private_mb()
     print(f"idle after start:            {idle:6.1f} MB{extra()}")
+    if args.breakdown and sys.platform == "win32":
+        print(windows_breakdown())
 
     for _ in range(4):
         window.new_tab()
@@ -134,6 +197,8 @@ def main() -> int:
     gc.collect()
     busy = private_mb()
     print(f"5 tabs, 40 requests sent:    {busy:6.1f} MB{extra()}")
+    if args.breakdown and sys.platform == "win32":
+        print(windows_breakdown())
     window.close()
     app.quit()
     server.shutdown()
