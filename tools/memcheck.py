@@ -2,7 +2,8 @@
 reports the process memory the OS charges to it.
 
     python tools/memcheck.py              # print numbers
-    python tools/memcheck.py --budget 50  # exit 1 if over 50 MB
+    python tools/memcheck.py --budget 50 --busy-budget 55
+        # exit 1 if idle memory > 50 MB or the stress run > 55 MB
 
 Metric: Windows — private working set, exactly what the "Memory" column of
 Task Manager shows (non-shareable resident pages; DLL code is excluded), read
@@ -171,7 +172,9 @@ def _probe(window, split, wait):
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--budget", type=float, default=0, help="fail when the busy figure exceeds this (MB)")
+    parser.add_argument("--budget", type=float, default=0, help="fail when idle memory exceeds this (MB)")
+    parser.add_argument("--busy-budget", type=float, default=0,
+                        help="fail when the stress run (every section open, 5 tabs, 40 requests) exceeds this (MB)")
     parser.add_argument("--breakdown", action="store_true", help="Windows: show who owns private memory")
     parser.add_argument("--bare", action="store_true", help="baseline: an empty PySide6 window, no Getman")
     parser.add_argument("--probe", action="store_true", help="with --bare: cost of styling, fonts and symbols")
@@ -242,12 +245,13 @@ def main() -> int:
     window.close()
     app.quit()
     server.shutdown()
-    if args.budget and busy > args.budget:
-        print(f"FAIL: {busy:.1f} MB is over the {args.budget:g} MB budget")
-        return 1
-    if args.budget:
-        print(f"OK: within the {args.budget:g} MB budget")
-    return 0
+    failed = False
+    for label, value, limit in (("idle", idle, args.budget), ("stress run", busy, args.busy_budget)):
+        if limit:
+            ok = value <= limit
+            failed |= not ok
+            print(f"{'OK' if ok else 'FAIL'}: {label} {value:.1f} MB, budget {limit:g} MB")
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

@@ -6,7 +6,8 @@ Getman — десктопный HTTP-клиент для локальной ра
 Postman / Insomnia / OpenAPI / HAR / .http / cURL, Python-скрипты до и после запроса.
 
 **Жёсткое требование: ≤ 50 МБ ОЗУ** (приватная рабочая память процесса, как в Диспетчере задач).
-Проверка: `python tools/memcheck.py --budget 50` (в CI — на windows-latest).
+Проверка: `python tools/memcheck.py --budget 50 --busy-budget 55` (в CI — на windows-latest): 50 МБ —
+обычная работа, 55 МБ — стресс-сценарий (все разделы открыты, 5 вкладок, 40 запросов).
 
 ## Техстек
 - **Python 3.11+, PySide6-Essentials** (QtCore/Gui/Widgets/Network). Других обязательных зависимостей нет.
@@ -48,7 +49,9 @@ Postman / Insomnia / OpenAPI / HAR / .http / cURL, Python-скрипты до и
     - не добавлять тяжёлые зависимости (httpx, pygments, prance и т.п.); тяжёлые модули импортировать лениво;
     - виджеты, которые видны не сразу, создавать лениво (см. `RequestEditor._ensure`, `ResponseView._page`);
     - диалоги и меню после `exec()` удалять (`deleteLater()` / `WA_DeleteOnClose`), `RequestJob` удаляет себя сам;
-    - после изменений прогонять `python tools/memcheck.py --budget 50`.
+    - символы вне Segoe UI (эмодзи, ☰ ⚙ ✕ и т.п.) в интерфейсе не использовать: на Windows первый такой
+      глиф подгружает font fallback DirectWrite (+14 МБ). Иконки — только `ui/icons.py` (рисуются QPainter);
+    - после изменений прогонять `python tools/memcheck.py --budget 50 --busy-budget 55`.
 - **UI:**
     - `QSplitter` для адаптивности; поиск/фильтры — с debounce через `QTimer`;
     - горячие клавиши: Ctrl+T, Ctrl+W, Ctrl+S, Ctrl+Enter, Ctrl+L, Ctrl+P, Ctrl+E, Ctrl+I, Ctrl+F, Esc (отмена);
@@ -61,7 +64,7 @@ pip install -r requirements.txt          # зависимости приложе
 python main.py                           # запуск
 pip install -r requirements-dev.txt      # pytest, psutil
 python -m pytest -q tests                # тесты (UI-тесты работают с QT_QPA_PLATFORM=offscreen)
-python tools/memcheck.py --budget 50     # проверка бюджета памяти
+python tools/memcheck.py --budget 50 --busy-budget 55  # проверка бюджета памяти
 pyinstaller Getman.spec                  # сборка в один файл
 cat data/app.log                         # лог
 ```

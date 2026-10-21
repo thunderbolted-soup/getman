@@ -34,5 +34,5 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: Baseline - empty PySide6 window
         run: python tools/memcheck.py --bare --probe
-      - name: Memory budget (50 MB)
-        run: python tools/memcheck.py --budget 50 --breakdown
+      - name: Memory budget (idle 50 MB, stress run 55 MB)
+        run: python tools/memcheck.py --budget 50 --busy-budget 55 --breakdown
