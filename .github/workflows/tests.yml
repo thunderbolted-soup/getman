@@ -33,6 +33,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
       - name: Baseline - empty PySide6 window
-        run: python tools/memcheck.py --bare --breakdown
+        run: python tools/memcheck.py --bare --probe
       - name: Memory budget (50 MB)
         run: python tools/memcheck.py --budget 50 --breakdown

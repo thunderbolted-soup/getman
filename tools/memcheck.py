@@ -133,11 +133,41 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         pass
 
 
+def _probe(window, split, wait):
+    """Adds Getman's ingredients to a bare window one by one."""
+    from PySide6.QtWidgets import QApplication, QLabel
+
+    def step(name):
+        wait(600)
+        gc.collect()
+        print(f"  + {name:34} {private_mb():6.1f} MB")
+
+    from ui import theme
+    theme.apply_theme(QApplication.instance(), "dark")
+    step("dark theme (palette + QSS)")
+    font = theme.mono_font(10)
+    step("monospace font resolved")
+    plain = QLabel("GET POST Params Headers Body Send Save Collections")
+    split.addWidget(plain)
+    step("label, UI font")
+    mono = QLabel('{ "name": "Ann", "age": 31 }')
+    mono.setFont(font)
+    split.addWidget(mono)
+    step("label, monospace font")
+    symbols = QLabel("☰ ⚙ ⋯ ⌕ ⧉ ⤓ ↩ ✕ ＋ ● ⟳ ▾ ✔ ✘")
+    split.addWidget(symbols)
+    step("label, symbol glyphs")
+    emoji = QLabel("👁 📁 🌐")
+    split.addWidget(emoji)
+    step("label, emoji glyphs")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--budget", type=float, default=0, help="fail when the busy figure exceeds this (MB)")
     parser.add_argument("--breakdown", action="store_true", help="Windows: show who owns private memory")
     parser.add_argument("--bare", action="store_true", help="baseline: an empty PySide6 window, no Getman")
+    parser.add_argument("--probe", action="store_true", help="with --bare: cost of styling, fonts and symbols")
     args = parser.parse_args()
     print(f"python started:              {private_mb():6.1f} MB")
 
@@ -169,11 +199,14 @@ def main() -> int:
         print(f"bare PySide6 window shown:   {private_mb():6.1f} MB{extra()}")
         if args.breakdown and sys.platform == "win32":
             print(windows_breakdown())
+        if args.probe:
+            _probe(window, split, wait)
         return 0
 
     from ui.main_window import MainWindow
     print(f"Getman modules imported:     {private_mb():6.1f} MB")
     window = MainWindow()
+    print(f"main window constructed:     {private_mb():6.1f} MB")
     window.resize(1360, 860)
     window.show()
     wait(1500)
