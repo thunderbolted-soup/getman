@@ -295,56 +295,70 @@ class RequestEditor(QWidget):
         none.setObjectName("Faint")
         none.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.body_stack.addWidget(none)
-        text_page = QWidget()
-        tl = QVBoxLayout(text_page)
-        tl.setContentsMargins(0, 0, 0, 0)
-        self.body_text = self._code("json")
-        self.body_text.textChanged.connect(self._emit_changed)
+        self._body_pages = {}  # one page per body kind, built when first selected
+        lay.addWidget(self.body_stack, 1)
         self.body_error = QLabel("")
         self.body_error.setStyleSheet(f"color: {theme.color('danger')};")
         self.body_error.hide()
-        self.body_text.validity_changed.connect(self._on_body_validity)
-        tl.addWidget(self.body_text)
-        tl.addWidget(self.body_error)
-        self.body_stack.addWidget(text_page)
-        self.form = self._kv(with_type=True, placeholders=("Field", "Value"))
-        self.form.changed.connect(self._emit_changed)
-        self.body_stack.addWidget(self.form)
-        self.urlencoded = self._kv(placeholders=("Field", "Value"))
-        self.urlencoded.changed.connect(self._emit_changed)
-        self.body_stack.addWidget(self.urlencoded)
-        binary = QWidget()
-        bl = QVBoxLayout(binary)
-        bl.setContentsMargins(0, 0, 0, 0)
-        row = QHBoxLayout()
-        self.binary_path = SmartLineEdit(variables=self._var_provider)
-        self.binary_path.setPlaceholderText("Path to the file to send as the request body")
-        self.binary_path.textChanged.connect(self._emit_changed)
-        browse = QPushButton("Choose file…")
-        browse.clicked.connect(self._choose_binary)
-        row.addWidget(self.binary_path, 1)
-        row.addWidget(browse)
-        bl.addLayout(row)
-        bl.addStretch()
-        self.body_stack.addWidget(binary)
-        gql = QSplitter(Qt.Orientation.Horizontal)
-        self.gql_query = self._code("graphql")
-        self.gql_query.setPlaceholderText("query {\n  viewer { id }\n}")
-        self.gql_vars = self._code("json")
-        self.gql_vars.setPlaceholderText('{\n  "id": 1\n}')
-        for w, title in ((self.gql_query, "Query"), (self.gql_vars, "Variables (JSON)")):
-            w.textChanged.connect(self._emit_changed)
-            box = QWidget()
-            bl2 = QVBoxLayout(box)
-            bl2.setContentsMargins(0, 0, 4, 0)
-            label = QLabel(title)
-            label.setObjectName("SectionTitle")
-            bl2.addWidget(label)
-            bl2.addWidget(w)
-            gql.addWidget(box)
-        gql.setSizes([600, 300])
-        self.body_stack.addWidget(gql)
-        lay.addWidget(self.body_stack, 1)
+        lay.addWidget(self.body_error)
+        return page
+
+    def _body_page(self, key: str) -> QWidget:
+        page = self._body_pages.get(key)
+        if page is not None:
+            return page
+        was_loading, self._loading = self._loading, True
+        body = self._request["body"]
+        if key == "text":
+            page = self.body_text = self._code("json")
+            self.body_text.textChanged.connect(self._emit_changed)
+            self.body_text.validity_changed.connect(self._on_body_validity)
+            self.body_text.setPlainText(body["text"])
+        elif key == "form":
+            page = self.form = self._kv(with_type=True, placeholders=("Field", "Value"))
+            self.form.changed.connect(self._emit_changed)
+            self.form.set_rows(body["form"])
+        elif key == "urlencoded":
+            page = self.urlencoded = self._kv(placeholders=("Field", "Value"))
+            self.urlencoded.changed.connect(self._emit_changed)
+            self.urlencoded.set_rows(body["urlencoded"])
+        elif key == "binary":
+            page = QWidget()
+            bl = QVBoxLayout(page)
+            bl.setContentsMargins(0, 0, 0, 0)
+            row = QHBoxLayout()
+            self.binary_path = SmartLineEdit(variables=self._var_provider)
+            self.binary_path.setPlaceholderText("Path to the file to send as the request body")
+            self.binary_path.setText(body["file"])
+            self.binary_path.textChanged.connect(self._emit_changed)
+            browse = QPushButton("Choose file…")
+            browse.clicked.connect(self._choose_binary)
+            row.addWidget(self.binary_path, 1)
+            row.addWidget(browse)
+            bl.addLayout(row)
+            bl.addStretch()
+        else:  # graphql
+            page = QSplitter(Qt.Orientation.Horizontal)
+            self.gql_query = self._code("graphql")
+            self.gql_query.setPlaceholderText("query {\n  viewer { id }\n}")
+            self.gql_query.setPlainText(body["graphql"]["query"])
+            self.gql_vars = self._code("json")
+            self.gql_vars.setPlaceholderText('{\n  "id": 1\n}')
+            self.gql_vars.setPlainText(body["graphql"]["variables"])
+            for w, title in ((self.gql_query, "Query"), (self.gql_vars, "Variables (JSON)")):
+                w.textChanged.connect(self._emit_changed)
+                box = QWidget()
+                bl2 = QVBoxLayout(box)
+                bl2.setContentsMargins(0, 0, 4, 0)
+                label = QLabel(title)
+                label.setObjectName("SectionTitle")
+                bl2.addWidget(label)
+                bl2.addWidget(w)
+                page.addWidget(box)
+            page.setSizes([600, 300])
+        self._body_pages[key] = page
+        self.body_stack.addWidget(page)
+        self._loading = was_loading
         return page
 
     def _build_auth(self) -> QWidget:
@@ -373,13 +387,9 @@ class RequestEditor(QWidget):
         self.pre_script = self._code("python")
         self.pre_script.setPlaceholderText("# runs before the request is sent\n"
                                            "# env['timestamp'] = str(int(time.time()))")
-        self.post_script = self._code("python")
-        self.post_script.setPlaceholderText("# runs after the response arrives\n"
-                                            "# env['token'] = response.json()['access_token']\n"
-                                            "# test('status is 200', response.status == 200)")
-        for editor in (self.pre_script, self.post_script):
-            editor.textChanged.connect(self._emit_changed)
-            self.script_stack.addWidget(editor)
+        self.pre_script.textChanged.connect(self._emit_changed)
+        self.script_stack.addWidget(self.pre_script)
+        self._post_editor = None
         lay.addWidget(self.script_stack, 1)
         help_label = QLabel(SCRIPT_HELP)
         help_label.setObjectName("Dim")
@@ -387,6 +397,22 @@ class RequestEditor(QWidget):
         lay.addWidget(help_label)
         self._on_script_kind("pre")
         return page
+
+    @property
+    def post_script(self) -> CodeEditor:
+        """Built the first time "Post-response" is opened."""
+        if self._post_editor is None:
+            was_loading, self._loading = self._loading, True
+            editor = self._code("python")
+            editor.setPlaceholderText("# runs after the response arrives\n"
+                                      "# env['token'] = response.json()['access_token']\n"
+                                      "# test('status is 200', response.status == 200)")
+            editor.setPlainText(self._request["scripts"]["post"])
+            editor.textChanged.connect(self._emit_changed)
+            self.script_stack.addWidget(editor)
+            self._post_editor = editor
+            self._loading = was_loading
+        return self._post_editor
 
     def _build_notes(self) -> QWidget:
         self.notes = QPlainTextEdit()
@@ -405,19 +431,26 @@ class RequestEditor(QWidget):
         elif name == "body":
             body = req["body"]
             self.body_mode.set_value(body["mode"])
-            self.body_text.setPlainText(body["text"])
-            self.form.set_rows(body["form"])
-            self.urlencoded.set_rows(body["urlencoded"])
-            self.binary_path.setText(body["file"])
-            self.gql_query.setPlainText(body["graphql"]["query"])
-            self.gql_vars.setPlainText(body["graphql"]["variables"])
+            pages = self._body_pages
+            if "text" in pages:
+                self.body_text.setPlainText(body["text"])
+            if "form" in pages:
+                self.form.set_rows(body["form"])
+            if "urlencoded" in pages:
+                self.urlencoded.set_rows(body["urlencoded"])
+            if "binary" in pages:
+                self.binary_path.setText(body["file"])
+            if "graphql" in pages:
+                self.gql_query.setPlainText(body["graphql"]["query"])
+                self.gql_vars.setPlainText(body["graphql"]["variables"])
             self._apply_body_mode(body["mode"])
         elif name == "auth":
             self.auth.set_auth(req["auth"])
             self.auth.set_inherit_hint(self.inherit_hint())
         elif name == "scripts":
             self.pre_script.setPlainText(req["scripts"]["pre"])
-            self.post_script.setPlainText(req["scripts"]["post"])
+            if self._post_editor is not None:
+                self._post_editor.setPlainText(req["scripts"]["post"])
         elif name == "notes":
             self.notes.setPlainText(req.get("description", ""))
 
@@ -428,15 +461,24 @@ class RequestEditor(QWidget):
         elif name == "headers":
             req["headers"] = self.headers.rows()
         elif name == "body":
-            req["body"] = {"mode": self.body_mode.value(), "text": self.body_text.toPlainText(),
-                           "form": self.form.rows(), "urlencoded": self.urlencoded.rows(),
-                           "file": self.binary_path.text(),
-                           "graphql": {"query": self.gql_query.toPlainText(),
-                                       "variables": self.gql_vars.toPlainText()}}
+            body, pages = req["body"], self._body_pages  # unbuilt pages keep the loaded values
+            body["mode"] = self.body_mode.value()
+            if "text" in pages:
+                body["text"] = self.body_text.toPlainText()
+            if "form" in pages:
+                body["form"] = self.form.rows()
+            if "urlencoded" in pages:
+                body["urlencoded"] = self.urlencoded.rows()
+            if "binary" in pages:
+                body["file"] = self.binary_path.text()
+            if "graphql" in pages:
+                body["graphql"] = {"query": self.gql_query.toPlainText(), "variables": self.gql_vars.toPlainText()}
         elif name == "auth":
             req["auth"] = self.auth.auth()
         elif name == "scripts":
-            req["scripts"] = {"pre": self.pre_script.toPlainText(), "post": self.post_script.toPlainText()}
+            req["scripts"]["pre"] = self.pre_script.toPlainText()
+            if self._post_editor is not None:
+                req["scripts"]["post"] = self._post_editor.toPlainText()
         elif name == "notes":
             req["description"] = self.notes.toPlainText()
 
@@ -577,10 +619,12 @@ class RequestEditor(QWidget):
         self._emit_changed()
 
     def _apply_body_mode(self, mode: str):
-        index = {"none": 0, "json": 1, "xml": 1, "text": 1, "form": 2, "urlencoded": 3, "binary": 4,
-                 "graphql": 5}[mode]
-        self.body_stack.setCurrentIndex(index)
-        if mode in ("json", "xml", "text"):
+        key = {"json": "text", "xml": "text", "text": "text"}.get(mode, mode)
+        if key == "none":
+            self.body_stack.setCurrentIndex(0)
+        else:
+            self.body_stack.setCurrentWidget(self._body_page(key))
+        if key == "text":
             self.body_text.set_language(mode)
         self.beautify_btn.setVisible(mode in ("json", "xml", "graphql"))
         if mode != "json":
@@ -609,7 +653,7 @@ class RequestEditor(QWidget):
             self.binary_path.setText(path)
 
     def _on_script_kind(self, kind: str):
-        self.script_stack.setCurrentIndex(0 if kind == "pre" else 1)
+        self.script_stack.setCurrentWidget(self.pre_script if kind == "pre" else self.post_script)
         self.snippets_menu.clear()
         editor = self.pre_script if kind == "pre" else self.post_script
         for title, code in (PRE_SNIPPETS if kind == "pre" else POST_SNIPPETS):

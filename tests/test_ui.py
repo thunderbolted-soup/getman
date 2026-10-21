@@ -239,3 +239,25 @@ def test_beautify_json_keeps_variables():
     from ui.request_editor import beautify_json
     assert beautify_json('{"a":{{num}},"b":"Bearer {{t}}","c":[1,2]}') == \
         '{\n  "a": {{num}},\n  "b": "Bearer {{t}}",\n  "c": [\n    1,\n    2\n  ]\n}'
+
+
+def test_lazy_sections_keep_unopened_data(window):
+    from core.models import kv, new_request
+    req = new_request("Lazy", "POST", "http://h/x")
+    req["body"].update({"mode": "form", "form": [kv("f", "1", type="text")], "text": "{\"a\": 1}",
+                        "graphql": {"query": "{ me }", "variables": ""}})
+    req["scripts"] = {"pre": "x = 1", "post": "test('ok', True)"}
+    window.new_tab(req)
+    editor = window.editor
+    assert editor.dump()["body"] == window._current.request["body"]  # nothing built yet, nothing lost
+    editor.show_section("body")
+    editor.body_mode.set_value("json")
+    editor._on_body_mode("json")
+    assert editor.body_text.toPlainText() == '{"a": 1}'
+    dumped = editor.dump()
+    assert dumped["body"]["mode"] == "json" and dumped["body"]["form"] == [kv("f", "1", type="text")]
+    assert dumped["body"]["graphql"]["query"] == "{ me }"
+    assert dumped["scripts"]["post"] == "test('ok', True)"  # post-response editor never opened
+    editor.show_section("scripts")
+    editor.post_script.setPlainText("log(1)")
+    assert editor.dump()["scripts"] == {"pre": "x = 1", "post": "log(1)"}
