@@ -5,10 +5,13 @@ __pycache__/
 env/
 venv/
 ENV/
+.pytest_cache/
+build/
+dist/
 
-# User data
-data/*.json
-data/collections/*.json
+# User data (collections, environments, history, session, logs)
+data/*
+!data/collections/
+data/collections/*
 !data/collections/.gitkeep
 advanced_getman_roadmap.md
-data/app.log

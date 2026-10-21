@@ -1,34 +1,27 @@
-import sys
+import gc
 import os
-from PySide6.QtWidgets import QApplication
+import sys
 
-# Ensure data directories exist on startup
-from core.collection import ensure_collections_dir
-from storage.store import ensure_dir
 
-from ui.main_window import MainWindow
+def main() -> int:
+    os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication
 
-from core.logger import get_logger
-
-logger = get_logger()
-
-def setup_app():
-    ensure_collections_dir()
-    if not os.path.exists("data"):
-        os.makedirs("data")
-    logger.info("Application setup complete")
-
-def main():
-    setup_app()
-    
+    QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     app = QApplication(sys.argv)
     app.setApplicationName("Getman")
-    
+    app.setOrganizationName("Getman")
+
+    from ui.main_window import MainWindow
     window = MainWindow()
     window.show()
-    
-    logger.info("Starting Getman event loop")
-    sys.exit(app.exec())
+
+    # Startup objects live for the whole session: move them out of the GC's way.
+    gc.collect()
+    gc.freeze()
+    return app.exec()
+
 
 if __name__ == "__main__":
     sys.exit(main())
