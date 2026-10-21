@@ -46,7 +46,8 @@ def _load_structured(text: str, filename: str):
         except ImportError as e:
             raise ImportError_("YAML import needs PyYAML: pip install pyyaml") from e
         try:
-            return yaml.safe_load(text)
+            # libyaml (C) is ~5x faster on big specs; pure-Python loader as a fallback
+            return yaml.load(text, Loader=getattr(yaml, "CSafeLoader", yaml.SafeLoader))
         except yaml.YAMLError as e:
             raise ImportError_(f"Invalid YAML: {e}") from e
     return None
@@ -91,7 +92,7 @@ def _detect_data(data) -> str:
                        "HAR and Getman JSON.")
 
 
-def parse_text(text: str, filename: str = "") -> ImportResult:
+def parse_text(text: str, filename: str = "", base_dir: Optional[str] = None) -> ImportResult:
     text = text.lstrip("﻿")
     if not text.strip():
         raise ImportError_("Nothing to import.")
@@ -105,10 +106,11 @@ def parse_text(text: str, filename: str = "") -> ImportResult:
         from core.importers import httpfile
         return httpfile.parse(text, filename)
     data = _load_structured(text, filename)
-    return parse_data(data, kind, filename)
+    return parse_data(data, kind, filename, base_dir)
 
 
-def parse_data(data, kind: Optional[str] = None, filename: str = "") -> ImportResult:
+def parse_data(data, kind: Optional[str] = None, filename: str = "",
+               base_dir: Optional[str] = None) -> ImportResult:
     kind = kind or _detect_data(data)
     if kind == "getman":
         from core.models import normalize_collection
@@ -129,7 +131,7 @@ def parse_data(data, kind: Optional[str] = None, filename: str = "") -> ImportRe
         return insomnia.parse(data) if kind == "insomnia" else insomnia.parse_v5(data)
     if kind == "openapi":
         from core.importers import openapi
-        return openapi.parse(data)
+        return openapi.parse(data, base_dir)
     if kind == "har":
         from core.importers import har
         return har.parse(data, filename)
@@ -146,4 +148,4 @@ def parse_file(path: str) -> ImportResult:
         text = raw.decode("utf-8")
     except UnicodeDecodeError:
         text = raw.decode("latin-1")
-    return parse_text(text, os.path.basename(path))
+    return parse_text(text, os.path.basename(path), os.path.dirname(os.path.abspath(path)))

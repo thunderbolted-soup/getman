@@ -336,3 +336,56 @@ def test_stores_and_legacy_migration(tmp_path):
 
 def test_rank_prefers_prefix():
     assert rank("us", ["/api/users", "users", "status"]) == ["users", "/api/users", "status"]
+
+
+def test_openapi_external_file_refs(tmp_path):
+    (tmp_path / "schemas").mkdir()
+    (tmp_path / "common.yaml").write_text("Id: {type: integer, example: 7}\n")
+    (tmp_path / "schemas" / "pet.yaml").write_text(
+        "Pet:\n  type: object\n  properties:\n    id: {$ref: '../common.yaml#/Id'}\n"
+        "    tag: {$ref: '#/Tag'}\nTag: {type: string, example: cute}\n")
+    (tmp_path / "params.yaml").write_text("limit: {name: limit, in: query, required: true, schema: {type: integer}}\n")
+    (tmp_path / "api.yaml").write_text(
+        "openapi: 3.0.3\ninfo: {title: Split}\nservers: [{url: 'https://split.io'}]\npaths:\n  /pets:\n    post:\n"
+        "      parameters: [{$ref: 'params.yaml#/limit'}]\n"
+        "      requestBody: {content: {application/json: {schema: {$ref: 'schemas/pet.yaml#/Pet'}}}}\n")
+    res = importers.parse_file(str(tmp_path / "api.yaml"))
+    req = res.collections[0]["items"][0]
+    assert json.loads(req["body"]["text"]) == {"id": 7, "tag": "cute"}
+    assert req["url"] == "{{baseUrl}}/pets?limit=0" and not res.warnings
+    pasted = importers.parse_text((tmp_path / "api.yaml").read_text(), "api.yaml")
+    assert any("other files" in w for w in pasted.warnings)
+
+
+def test_openapi_query_serialization_and_versions():
+    def param(name, schema, **kw):
+        return {"name": name, "in": "query", "required": True, "schema": schema, **kw}
+
+    obj = {"type": "object", "properties": {"type": {"type": "string", "example": "account"},
+                                            "user": {"type": "string", "example": "u1"}}}
+    arr = {"type": "array", "items": {"type": "string", "example": "a"}, "example": ["a", "b"]}
+    spec = {"openapi": "3.2.0", "info": {"title": "Q"}, "servers": [{"url": "https://q.io"}], "paths": {
+        "/deep": {"get": {"parameters": [param("scope", obj, style="deepObject", explode=True)]}},
+        "/form": {"get": {"parameters": [param("filter", obj), param("ids", arr)]}},
+        "/csv": {"get": {"parameters": [param("ids", arr, explode=False), param("p", arr, style="pipeDelimited")]}},
+        "/upload": {"post": {"servers": [{"url": "https://files.q.io/v2"}], "requestBody": {"content": {
+            "multipart/form-data": {"schema": {"type": "object", "properties": {
+                "file": {"type": "string", "contentMediaType": "image/png"}, "note": {"type": "string"}}}}}}}},
+        "/raw": {"put": {"requestBody": {"content": {"application/octet-stream": {}}}}},
+    }}
+    res = importers.parse_data(spec)
+    assert res.kind == "OpenAPI 3.2.0"
+    deep, form, csv, upload, raw = res.collections[0]["items"]
+    assert deep["url"] == "{{baseUrl}}/deep?scope[type]=account&scope[user]=u1"
+    assert form["url"] == "{{baseUrl}}/form?type=account&user=u1&ids=a&ids=b"
+    assert csv["url"] == "{{baseUrl}}/csv?ids=a,b&p=a|b"
+    assert upload["url"] == "https://files.q.io/v2/upload"
+    assert [(r["key"], r["type"]) for r in upload["body"]["form"]] == [("file", "file"), ("note", "text")]
+    assert raw["body"]["mode"] == "binary"
+
+    swagger = {"swagger": "2.0", "info": {"title": "S"}, "host": "s.io", "paths": {"/x": {"get": {"parameters": [
+        {"name": "tags", "in": "query", "type": "array", "items": {"type": "string"}, "collectionFormat": "multi",
+         "required": True, "x-example": None, "default": ["a", "b"]},
+        {"name": "ids", "in": "query", "type": "array", "items": {"type": "integer"}, "required": True,
+         "default": [1, 2]}]}}}}
+    assert importers.parse_data(swagger).collections[0]["items"][0]["url"] == "{{baseUrl}}/x?tags=a&tags=b&ids=1,2"
