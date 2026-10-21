@@ -17,7 +17,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11' # Changed from 3.14 to 3.11 per user constraints
+        python-version: '3.11'
 
     - name: Install dependencies
       run: |
@@ -26,8 +26,7 @@ jobs:
         pip install pyinstaller
 
     - name: Build with PyInstaller
-      run: |
-        pyinstaller Getman.spec
+      run: pyinstaller Getman.spec
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4

@@ -1,151 +1,116 @@
+"""Collections live one-per-file in ``data/collections/*.json``."""
 import os
-import json
-from typing import List, Dict, Any, Optional, Tuple
-from storage.store import load_json, save_json
+import re
+from typing import Dict, List, Optional, Tuple
 
 from core.logger import get_logger
+from core.models import find_item, new_collection, normalize_collection
+from core.paths import data_path
+from core.storage import load_json, save_json
 
 logger = get_logger()
 
-COLLECTIONS_DIR = "data/collections"
 
-def ensure_collections_dir():
-    """Ensures the collections directory exists."""
-    if not os.path.exists(COLLECTIONS_DIR):
-        os.makedirs(COLLECTIONS_DIR)
+def _safe_filename(name: str) -> str:
+    safe = re.sub(r"[^\w\- ]+", "", name, flags=re.UNICODE).strip().replace(" ", "_")
+    return safe[:60] or "collection"
 
-def get_collections_list() -> List[str]:
-    """Returns a list of collection filenames."""
-    ensure_collections_dir()
-    return [f for f in os.listdir(COLLECTIONS_DIR) if f.endswith('.json')]
 
-def load_collection(filename: str) -> Optional[Dict[str, Any]]:
-    """Loads a collection from the collections directory."""
-    path = os.path.join(COLLECTIONS_DIR, filename)
-    logger.debug(f"Loading collection: {filename}")
-    return load_json(path)
+class CollectionStore:
+    def __init__(self, directory: str = None):
+        self.directory = directory or data_path("collections")
+        os.makedirs(self.directory, exist_ok=True)
+        self.collections: List[dict] = []
+        self._files: Dict[str, str] = {}
+        self.load()
 
-def save_collection(filename: str, data: Dict[str, Any]):
-    """Saves a collection to the collections directory."""
-    ensure_collections_dir()
-    path = os.path.join(COLLECTIONS_DIR, filename)
-    logger.info(f"Saving collection: {filename}")
-    save_json(path, data)
+    def load(self):
+        self.collections, self._files = [], {}
+        for filename in sorted(os.listdir(self.directory)):
+            if not filename.endswith(".json"):
+                continue
+            path = os.path.join(self.directory, filename)
+            raw = load_json(path)
+            if not isinstance(raw, dict):
+                logger.warning("Skipping unreadable collection file %s", filename)
+                continue
+            if "getman" not in raw:
+                # Files from Getman 1.x were stored in Postman format.
+                from core.importers import postman
+                try:
+                    raw = postman.parse_collection(raw)
+                except Exception as e:  # noqa: BLE001 - keep loading the others
+                    logger.warning("Cannot migrate %s: %s", filename, e)
+                    continue
+                col = normalize_collection(raw)
+                self._files[col["id"]] = filename
+                self.collections.append(col)
+                self.save(col)
+                logger.info("Migrated legacy collection %s", filename)
+                continue
+            col = normalize_collection(raw)
+            if col["id"] in self._files:  # duplicated file -> give it a new identity
+                from core.models import new_id
+                col["id"] = new_id()
+            self._files[col["id"]] = filename
+            self.collections.append(col)
+        self.collections.sort(key=lambda c: c["name"].lower())
 
-def import_external_collection(source_path: str) -> Optional[str]:
-    """Imports a collection from an external JSON file and saves it locally."""
-    logger.info(f"Importing collection from: {source_path}")
-    data = load_json(source_path)
-    
-    # Basic validation for Postman v2.1
-    if not data or "info" not in data or "item" not in data:
-        logger.error(f"Failed to import collection: Invalid format in {source_path}")
+    def get(self, col_id: str) -> Optional[dict]:
+        for col in self.collections:
+            if col["id"] == col_id:
+                return col
         return None
-    
-    # We maintain the data structure as is, but we could sanitize it here if needed.
-    # The current UI already handles the item recursion.
-    
-    name = data["info"].get("name", "Imported Collection")
-    safe_name = "".join([c for c in name if c.isalnum() or c in (' ', '_', '-')]).strip()
-    filename = f"{safe_name}.json"
-    
-    # Avoid simple collisions
-    base_filename = filename
-    counter = 1
-    while os.path.exists(os.path.join(COLLECTIONS_DIR, filename)):
-        filename = f"{safe_name}_{counter}.json"
-        counter += 1
-    
-    save_collection(filename, data)
-    logger.info(f"Collection imported and saved as: {filename}")
-    return filename
 
-def save_openapi_collection(collection: dict, env_vars: dict = None,
-                             auth_profiles: list = None,
-                             collection_name: str = "",
-                             create_env: bool = True,
-                             import_auth: bool = True) -> Tuple[Optional[str], Optional[dict], int]:
-    """Saves a converted OpenAPI collection with optional environment and auth profiles.
+    def _filename_for(self, col: dict) -> str:
+        if col["id"] in self._files:
+            return self._files[col["id"]]
+        base = _safe_filename(col["name"])
+        filename, i = f"{base}.json", 2
+        taken = set(self._files.values())
+        while filename in taken or os.path.exists(os.path.join(self.directory, filename)):
+            filename = f"{base}_{i}.json"
+            i += 1
+        self._files[col["id"]] = filename
+        return filename
 
-    Returns:
-        Tuple of (collection_filename, environment_dict, endpoint_count)
-    """
-    if not collection:
-        logger.error("No collection data provided")
-        return None, None, 0
+    def save(self, col: dict):
+        save_json(os.path.join(self.directory, self._filename_for(col)), col)
 
-    if collection_name:
-        collection["info"]["name"] = collection_name
+    def create(self, name: str) -> dict:
+        col = new_collection(name)
+        return self.add(col)
 
-    safe_name = "".join([c for c in collection["info"]["name"] if c.isalnum() or c in (' ', '_', '-')]).strip()
-    if not safe_name:
-        safe_name = "imported_openapi"
+    def add(self, col: dict) -> dict:
+        col = normalize_collection(col)
+        while self.get(col["id"]):
+            from core.models import new_id
+            col["id"] = new_id()
+        self.collections.append(col)
+        self.collections.sort(key=lambda c: c["name"].lower())
+        self.save(col)
+        return col
 
-    filename = f"{safe_name}.json"
-    counter = 1
-    while os.path.exists(os.path.join(COLLECTIONS_DIR, filename)):
-        filename = f"{safe_name}_{counter}.json"
-        counter += 1
+    def delete(self, col_id: str):
+        col = self.get(col_id)
+        if not col:
+            return
+        self.collections.remove(col)
+        filename = self._files.pop(col_id, None)
+        if filename:
+            try:
+                os.remove(os.path.join(self.directory, filename))
+            except OSError as e:
+                logger.warning("Cannot delete %s: %s", filename, e)
 
-    endpoint_count = sum(len(f.get("item", [])) for f in collection.get("item", []))
+    def find(self, item_id: str) -> Optional[Tuple[dict, dict, Tuple[dict, ...]]]:
+        """Locates any folder/request: returns (collection, item, ancestors)."""
+        for col in self.collections:
+            found = find_item(col, item_id)
+            if found:
+                return col, found[0], found[1]
+        return None
 
-    save_collection(filename, collection)
-    logger.info(f"OpenAPI collection saved as: {filename} ({endpoint_count} endpoints)")
-
-    result_env = None
-    env_vars = env_vars or {}
-    if create_env and env_vars:
-        from core.environment import save_environments, get_all_environments
-        env_name = f"{collection['info']['name']} Environment"
-        new_env = {
-            "name": env_name,
-            "values": [{"key": k, "value": str(v), "enabled": True} for k, v in env_vars.items()],
-        }
-        envs = get_all_environments() or []
-        envs.append(new_env)
-        save_environments(envs)
-        result_env = new_env
-        logger.info(f"Created environment '{env_name}' with {len(env_vars)} variables")
-
-    auth_profiles = auth_profiles or []
-    if import_auth and auth_profiles:
-        from core.auth import save_auth_entry
-        for profile in auth_profiles:
-            save_auth_entry(
-                name=profile["name"],
-                auth_type=profile["type"],
-                auth_data=profile["data"],
-            )
-        logger.info(f"Imported {len(auth_profiles)} auth profiles")
-
-    return filename, result_env, endpoint_count
-
-def delete_collection(filename: str):
-    """Deletes a collection file."""
-    path = os.path.join(COLLECTIONS_DIR, filename)
-    if os.path.exists(path):
-        logger.warning(f"Deleting collection: {filename}")
-        os.remove(path)
-
-def create_new_collection(name: str) -> str:
-    """Creates a new empty collection with the given name."""
-    data = {
-        "info": {
-            "name": name,
-            "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-        },
-        "item": []
-    }
-    safe_name = "".join([c for c in name if c.isalnum() or c in (' ', '_', '-')]).strip().replace(' ', '_')
-    if not safe_name: safe_name = "new_collection"
-    filename = f"{safe_name}.json"
-    
-    # Avoid collisions
-    base_name = safe_name
-    counter = 1
-    while os.path.exists(os.path.join(COLLECTIONS_DIR, filename)):
-        filename = f"{base_name}_{counter}.json"
-        counter += 1
-        
-    save_collection(filename, data)
-    return filename
+    def file_path(self, col_id: str) -> Optional[str]:
+        filename = self._files.get(col_id)
+        return os.path.join(self.directory, filename) if filename else None
